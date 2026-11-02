@@ -1,0 +1,21 @@
+{
+  "name": "yorbalance-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-shop ledger and billing application for saree and silk businesses",
+  "workspaces": [
+    "shared",
+    "functions",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "npm run dev --workspace=web",
+    "dev:api": "npm run dev --workspace=functions",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
