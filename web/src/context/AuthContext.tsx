@@ -65,20 +65,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSession = useCallback(async () => {
     try {
+      const token = await getToken();
+      if (!token) {
+        setUser(null);
+        setShop(null);
+        setLatestVerification(null);
+        setLoading(false);
+        return;
+      }
       const data = await api.getMe();
       setUser(data.user);
       setShop(data.shop);
       setLatestVerification(data.latest_verification || null);
-    } catch (err) {
-      console.warn('Session refresh notice:', err);
-      // Not authenticated or error
+    } catch (err: any) {
+      // If unauthorized or stale dev token, clear localStorage session
+      if (err?.status === 401 || err?.code === 'UNAUTHORIZED') {
+        localStorage.removeItem(DEV_SESSION_KEY);
+      }
       setUser(null);
       setShop(null);
       setLatestVerification(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getToken]);
 
   // Listen to Firebase Auth or restore dev session
   useEffect(() => {

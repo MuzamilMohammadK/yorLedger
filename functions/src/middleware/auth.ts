@@ -54,6 +54,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       }
     } else if (tokenType.startsWith('owner-')) {
       const email = tokenType.replace('owner-', '');
+      req.firebaseUid = `dev-uid-${email}`;
       const user = await db.findUserByEmail(email);
       if (user) {
         req.user = user;
@@ -61,9 +62,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         if (user.shop_id) {
           req.shop = await db.findShopById(user.shop_id);
         }
+      }
+      // If registering new shop, allow through with firebaseUid
+      if (user || req.path.endsWith('/register-shop')) {
         return next();
       }
     }
+    // Dev token provided but user not found
+    res.status(401).json({ code: 'UNAUTHORIZED', message: 'User session not found or invalid dev token' });
+    return;
   }
 
   // 2. Standard Firebase ID Token Verification
@@ -98,6 +105,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     let user = await db.findUserByFirebaseUid(firebaseUid);
     if (!user && email) {
       user = await db.findUserByEmail(email);
+    }
+
+    if (!user && !req.path.endsWith('/register-shop')) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'User not registered in database' });
+      return;
     }
 
     if (user) {

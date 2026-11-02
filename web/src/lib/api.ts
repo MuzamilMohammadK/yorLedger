@@ -45,7 +45,21 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers
   });
 
-  const data = await response.json().catch(() => ({}));
+  let data: any = {};
+  const text = await response.text();
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // If not JSON (e.g. Vite proxy ECONNREFUSED plain text error)
+    if (text.includes('ECONNREFUSED') || response.status === 500) {
+      data = {
+        message: 'Backend API server (http://localhost:5000) is unreachable. Please make sure the API server is running (run: npm run dev:api or npm run dev).',
+        code: 'BACKEND_UNREACHABLE'
+      };
+    } else {
+      data = { message: text || `Request failed with status ${response.status}`, code: 'UNKNOWN_ERROR' };
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(
