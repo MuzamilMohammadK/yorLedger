@@ -13,13 +13,19 @@ import {
   Phone,
   Mail,
   MapPin,
-  Percent,
   Lock,
   Eye,
   EyeOff,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  UploadCloud,
+  Image as ImageIcon,
+  X,
+  AlertCircle
 } from 'lucide-react';
+
+// Sample tiny JPEG base64 image data URI for test merchant auto-fill
+const SAMPLE_JPEG_DATA_URI = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 
 export const RegisterShopPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -34,6 +40,10 @@ export const RegisterShopPage: React.FC = () => {
     password: '',
     confirm_password: ''
   });
+
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [documentName, setDocumentName] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gstinMessage, setGstinMessage] = useState<{ text: string; isError: boolean } | null>(null);
@@ -76,6 +86,44 @@ export const RegisterShopPage: React.FC = () => {
     }
   };
 
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDocumentError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Strict JPEG/JPG format validation
+    const isJpeg = file.type === 'image/jpeg' || /\.jpe?g$/i.test(file.name);
+    if (!isJpeg) {
+      setDocumentError('Invalid file type! Shop verification document must be strictly in JPEG or JPG format.');
+      setDocumentUrl(null);
+      setDocumentName(null);
+      return;
+    }
+
+    // Size limit: 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      setDocumentError('Document file size must not exceed 5 MB.');
+      return;
+    }
+
+    setDocumentName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocumentUrl(reader.result as string);
+      setErrors(prev => ({ ...prev, document: '' }));
+    };
+    reader.onerror = () => {
+      setDocumentError('Failed to read the selected file. Please try again.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeDocument = () => {
+    setDocumentUrl(null);
+    setDocumentName(null);
+    setDocumentError(null);
+  };
+
   const validateForm = (): boolean => {
     const errs: Record<string, string> = {};
 
@@ -99,6 +147,10 @@ export const RegisterShopPage: React.FC = () => {
     }
 
     if (!formData.address.trim()) errs.address = 'Full shop address is required';
+
+    if (!documentUrl) {
+      errs.document = 'Please upload a shop document (GST/Trade license) in JPEG/JPG format for admin verification';
+    }
 
     if (!formData.password || formData.password.length < 8) {
       errs.password = 'Password must be at least 8 characters';
@@ -125,10 +177,12 @@ export const RegisterShopPage: React.FC = () => {
         mobile: formData.mobile.trim(),
         address: formData.address.trim(),
         state_code: formData.state_code,
-        default_gst_bp: parseInt(formData.default_gst_bp, 10)
+        default_gst_bp: parseInt(formData.default_gst_bp, 10),
+        document_url: documentUrl,
+        document_name: documentName
       });
 
-      // Navigation to pending approval is triggered upon state update or manual navigation
+      // Navigation to "Waiting for Admin Approval" screen
       navigate('/pending-approval');
     } catch (err: any) {
       console.error(err);
@@ -144,8 +198,6 @@ export const RegisterShopPage: React.FC = () => {
 
   // Helper to fill sample authentic data for testing convenience
   const fillSampleData = () => {
-    // 29AAAAA0000A1Z5 is Karnataka test GSTIN with valid format
-    // Let's use valid GSTIN format or test merchant:
     setFormData({
       shop_name: 'Sri Lakshmi Silks & Sarees',
       owner_name: 'Ramesh Sundaram',
@@ -158,6 +210,9 @@ export const RegisterShopPage: React.FC = () => {
       password: 'Password@123',
       confirm_password: 'Password@123'
     });
+    setDocumentUrl(SAMPLE_JPEG_DATA_URI);
+    setDocumentName('GST_Certificate_SriLakshmiSilks.jpg');
+    setDocumentError(null);
     handleGstinChange('29AAAAA0000A1Z5');
   };
 
@@ -173,7 +228,7 @@ export const RegisterShopPage: React.FC = () => {
             Register Your Saree & Silk Business
           </h1>
           <p className="mt-1.5 text-sm text-slate-600 max-w-lg mx-auto">
-            Create an official merchant account for your enterprise. Once verified by our administration team, your digital ledger and GST billing will be instantly activated.
+            Create an official merchant account for your enterprise. Upload your verification documents for admin review to activate your digital ledger.
           </p>
         </div>
 
@@ -182,7 +237,7 @@ export const RegisterShopPage: React.FC = () => {
           <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Shop Registration Application</h2>
-              <p className="text-xs text-slate-500">Provide official GSTIN and business owner details</p>
+              <p className="text-xs text-slate-500">Provide official business details and JPEG verification documents</p>
             </div>
             <button
               type="button"
@@ -287,10 +342,106 @@ export const RegisterShopPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Section 3: Contact & Access */}
+            {/* Section 3: Document Verification (JPEG/JPG required) */}
+            <div className="pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <UploadCloud className="w-4 h-4" /> 3. Shop Verification Document (JPEG/JPG Format)
+                </h3>
+                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  Required Format: .JPG / .JPEG
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Upload your official GST Certificate, Shop Establishment License, or Business Registration Proof.
+              </p>
+
+              {documentError && (
+                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{documentError}</span>
+                </div>
+              )}
+
+              {errors.document && (
+                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errors.document}</span>
+                </div>
+              )}
+
+              {!documentUrl ? (
+                <div className="border-2 border-dashed border-slate-300 hover:border-brand-800 transition-colors rounded-2xl p-6 text-center bg-slate-50/50">
+                  <input
+                    type="file"
+                    id="shop-document-input"
+                    accept=".jpg,.jpeg,image/jpeg"
+                    onChange={handleDocumentChange}
+                    className="hidden"
+                  />
+                  <label htmlFor="shop-document-input" className="cursor-pointer block">
+                    <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-3">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 block mb-1">
+                      Click to upload shop document in JPEG/JPG format
+                    </span>
+                    <span className="text-[11px] text-slate-500 block">
+                      Supported extensions: .jpg, .jpeg (Maximum size: 5 MB)
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="w-14 h-14 rounded-xl border border-slate-300 bg-white overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <img
+                        src={documentUrl}
+                        alt="Uploaded Document"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="overflow-hidden">
+                      <span className="text-xs font-bold text-slate-900 block truncate">
+                        {documentName || 'Shop_Document.jpg'}
+                      </span>
+                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> JPEG Format Verified
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="shop-document-replace"
+                      className="cursor-pointer text-xs font-semibold px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      Change
+                    </label>
+                    <input
+                      type="file"
+                      id="shop-document-replace"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      onChange={handleDocumentChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeDocument}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                      title="Remove document"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 4: Contact & Access */}
             <div className="pt-4 border-t border-slate-100">
               <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                <Lock className="w-4 h-4" /> 3. Contact & Login Credentials
+                <Lock className="w-4 h-4" /> 4. Contact & Login Credentials
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
@@ -357,7 +508,7 @@ export const RegisterShopPage: React.FC = () => {
                 className="w-full"
                 isLoading={isLoading}
               >
-                Register Shop & Submit for Verification
+                Submit Registration & Documents for Approval
               </Button>
             </div>
           </form>
@@ -373,4 +524,3 @@ export const RegisterShopPage: React.FC = () => {
     </div>
   );
 };
-

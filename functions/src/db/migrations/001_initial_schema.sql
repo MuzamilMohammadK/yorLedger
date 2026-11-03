@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS shops (
     state_code VARCHAR(2) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
     default_gst_bp INTEGER NOT NULL DEFAULT 500, -- 500 = 5%
+    document_url TEXT,
+    document_name VARCHAR(255),
     verified_at TIMESTAMPTZ,
     verified_by VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

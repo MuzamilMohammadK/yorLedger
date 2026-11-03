@@ -89,6 +89,8 @@ class MemoryStore implements DatabaseService {
       state_code: payload.state_code,
       status: 'PENDING',
       default_gst_bp: payload.default_gst_bp || 500,
+      document_url: payload.document_url || null,
+      document_name: payload.document_name || null,
       created_at: now,
       updated_at: now
     };
@@ -122,6 +124,8 @@ class MemoryStore implements DatabaseService {
       address: payload.address ?? shop.address,
       state_code: payload.state_code ?? shop.state_code,
       default_gst_bp: payload.default_gst_bp ?? shop.default_gst_bp,
+      document_url: payload.document_url !== undefined ? payload.document_url : shop.document_url,
+      document_name: payload.document_name !== undefined ? payload.document_name : shop.document_name,
       status: 'PENDING',
       updated_at: now
     };
@@ -230,8 +234,8 @@ class PostgresStore implements DatabaseService {
     try {
       await client.query('BEGIN');
       const shopRes = await client.query(
-        `INSERT INTO shops (gstin, name, owner_name, phone, email, address, state_code, status, default_gst_bp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8)
+        `INSERT INTO shops (gstin, name, owner_name, phone, email, address, state_code, status, default_gst_bp, document_url, document_name)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9, $10)
          RETURNING *`,
         [
           payload.gstin.toUpperCase(),
@@ -241,7 +245,9 @@ class PostgresStore implements DatabaseService {
           payload.email,
           payload.address,
           payload.state_code,
-          payload.default_gst_bp || 500
+          payload.default_gst_bp || 500,
+          payload.document_url || null,
+          payload.document_name || null
         ]
       );
       const shop = shopRes.rows[0];
@@ -274,9 +280,11 @@ class PostgresStore implements DatabaseService {
           address = COALESCE($5, address),
           state_code = COALESCE($6, state_code),
           default_gst_bp = COALESCE($7, default_gst_bp),
+          document_url = COALESCE($8, document_url),
+          document_name = COALESCE($9, document_name),
           status = 'PENDING',
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
+      WHERE id = $10
       RETURNING *
     `;
     const res = await this.pool.query(query, [
@@ -287,6 +295,8 @@ class PostgresStore implements DatabaseService {
       payload.address,
       payload.state_code,
       payload.default_gst_bp,
+      payload.document_url,
+      payload.document_name,
       shopId
     ]);
     if (!res.rows[0]) throw new Error('Shop not found');

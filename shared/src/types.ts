@@ -12,6 +12,8 @@ export interface Shop {
   state_code: string;
   status: ShopStatus;
   default_gst_bp: number; // In basis points (500 = 5%, 1200 = 12%, 1800 = 18%)
+  document_url?: string | null; // Document in JPEG/JPG format
+  document_name?: string | null;
   verified_at?: string | null;
   verified_by?: string | null;
   created_at: string;
@@ -46,6 +48,8 @@ export interface RegisterShopPayload {
   address: string;
   state_code: string;
   default_gst_bp: number; // e.g. 500 for 5%
+  document_url?: string | null; // JPEG/JPG document data URL or link
+  document_name?: string | null;
 }
 
 export interface ResubmitShopPayload {
@@ -56,6 +60,8 @@ export interface ResubmitShopPayload {
   address?: string;
   state_code?: string;
   default_gst_bp?: number;
+  document_url?: string | null;
+  document_name?: string | null;
 }
 
 export interface AdminDecisionPayload {

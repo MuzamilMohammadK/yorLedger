@@ -59,6 +59,18 @@ authRouter.post('/register-shop', requireAuth, async (req: Request, res: Respons
       errors.default_gst_bp = 'Default GST rate must be 5%, 12%, 18%, or 28%';
     }
 
+    // Document validation (JPEG/JPG format required)
+    if (!payload.document_url?.trim()) {
+      errors.document = 'Shop registration document in JPEG/JPG format is required';
+    } else {
+      const isJpeg = payload.document_url.startsWith('data:image/jpeg') || 
+                     payload.document_url.startsWith('data:image/jpg') ||
+                     /\.(jpg|jpeg)(\?.*)?$/i.test(payload.document_url);
+      if (!isJpeg) {
+        errors.document = 'Document must be in JPEG or JPG format';
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Validation failed', fields: errors });
       return;
@@ -156,6 +168,15 @@ authRouter.post('/resubmit', requireAuth, async (req: Request, res: Response): P
       if (!gstinRes.valid) errors.gstin = gstinRes.error || 'Invalid GSTIN';
       else if (payload.state_code && gstinRes.stateCode !== payload.state_code) {
         errors.state_code = 'State code does not match GSTIN prefix';
+      }
+    }
+
+    if (payload.document_url) {
+      const isJpeg = payload.document_url.startsWith('data:image/jpeg') || 
+                     payload.document_url.startsWith('data:image/jpg') ||
+                     /\.(jpg|jpeg)(\?.*)?$/i.test(payload.document_url);
+      if (!isJpeg) {
+        errors.document = 'Document must be in JPEG or JPG format';
       }
     }
 
