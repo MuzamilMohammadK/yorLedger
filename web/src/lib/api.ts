@@ -204,6 +204,54 @@ function fallbackHandler<T>(endpoint: string, options: RequestInit, token: strin
     return details as T;
   }
 
+  // Phase 2: /analytics/summary
+  if (endpoint.startsWith('/analytics/summary')) {
+    const url = new URL(`http://dummy${endpoint}`);
+    const period = (url.searchParams.get('period') as any) || 'this_month';
+    const activeShopId = localStorage.getItem('yorbalance_active_shop_id') || 'demo-shop-1';
+    const summary = clientStore.getDashboardSummary(activeShopId, period);
+    return {
+      shop: { id: activeShopId },
+      summary
+    } as T;
+  }
+
+  // Phase 2: /analytics/charts
+  if (endpoint.startsWith('/analytics/charts')) {
+    const url = new URL(`http://dummy${endpoint}`);
+    const period = (url.searchParams.get('period') as any) || 'this_month';
+    const activeShopId = localStorage.getItem('yorbalance_active_shop_id') || 'demo-shop-1';
+    const charts = clientStore.getDashboardCharts(activeShopId, period);
+    return {
+      shop_id: activeShopId,
+      period,
+      charts
+    } as T;
+  }
+
+  // Phase 2: /ledger/recent
+  if (endpoint.startsWith('/ledger/recent')) {
+    const url = new URL(`http://dummy${endpoint}`);
+    const limit = url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!, 10) : 10;
+    const search = url.searchParams.get('search') || undefined;
+    const activeShopId = localStorage.getItem('yorbalance_active_shop_id') || 'demo-shop-1';
+    const transactions = clientStore.getRecentTransactions(activeShopId, limit, search);
+    return {
+      shop_id: activeShopId,
+      count: transactions.length,
+      transactions
+    } as T;
+  }
+
+  // Phase 2: /ledger/transactions/:id
+  if (endpoint.startsWith('/ledger/transactions/')) {
+    const id = endpoint.replace('/ledger/transactions/', '');
+    const activeShopId = localStorage.getItem('yorbalance_active_shop_id') || 'demo-shop-1';
+    const transaction = clientStore.getTransactionById(activeShopId, id);
+    if (!transaction) throw new ApiError('Transaction not found', 'NOT_FOUND', 404);
+    return { transaction } as T;
+  }
+
   throw new ApiError(`Route ${endpoint} not implemented in fallback mode`, 'NOT_FOUND', 404);
 }
 
@@ -230,5 +278,19 @@ export const api = {
     request<{ message: string; shop: Shop; verification: ShopVerification }>(`/admin/shops/${id}/decision`, {
       method: 'POST',
       body: JSON.stringify(payload)
-    })
+    }),
+
+  // Phase 2: Dashboard Analytics & Ledger
+  getDashboardSummary: (period?: string) =>
+    request<{ summary: any }>(`/analytics/summary${period ? `?period=${period}` : ''}`),
+  getDashboardCharts: (period?: string) =>
+    request<{ charts: any }>(`/analytics/charts${period ? `?period=${period}` : ''}`),
+  getRecentTransactions: (limit = 10, search?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', limit.toString());
+    if (search) params.set('search', search);
+    return request<{ transactions: any[]; count: number }>(`/ledger/recent?${params.toString()}`);
+  },
+  getTransactionDetails: (id: string) =>
+    request<{ transaction: any }>(`/ledger/transactions/${id}`)
 };

@@ -3,11 +3,24 @@ import {
   ShopVerification,
   RegisterShopPayload,
   ResubmitShopPayload,
-  User
+  User,
+  Transaction,
+  Party,
+  DashboardSummary,
+  DashboardCharts,
+  DateRangeOption
 } from '@yorbalance/shared';
+import {
+  createSeedParties,
+  createSeedTransactions,
+  calculateSummary,
+  calculateCharts
+} from './demoData';
 
 const STORAGE_KEY_SHOPS = 'yorbalance_client_shops';
 const STORAGE_KEY_VERIFICATIONS = 'yorbalance_client_verifications';
+const STORAGE_KEY_TRANSACTIONS = 'yorbalance_client_transactions';
+const STORAGE_KEY_PARTIES = 'yorbalance_client_parties';
 
 const INITIAL_DEMO_SHOPS: Shop[] = [
   {
@@ -20,11 +33,11 @@ const INITIAL_DEMO_SHOPS: Shop[] = [
     address: 'Shop #14, Main Silk Bazaar, MG Road, Dharmavaram, Andhra Pradesh - 515671',
     state_code: '37',
     default_gst_bp: 500,
-    status: 'PENDING',
+    status: 'APPROVED',
     document_name: 'gst_certificate.jpg',
     document_url: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
-    verified_by: null,
-    verified_at: null,
+    verified_by: 'muzamilmohammadk@gmail.com',
+    verified_at: new Date(Date.now() - 86400000).toISOString(),
     created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
     updated_at: new Date(Date.now() - 3600000 * 4).toISOString()
   },
@@ -71,6 +84,24 @@ function loadVerifications(): ShopVerification[] {
 
 function saveVerifications(vers: ShopVerification[]) {
   localStorage.setItem(STORAGE_KEY_VERIFICATIONS, JSON.stringify(vers));
+}
+
+function loadTransactions(shopId: string): Transaction[] {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_TRANSACTIONS}_${shopId}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  const parties = createSeedParties(shopId);
+  const txs = createSeedTransactions(shopId, parties);
+  saveTransactions(shopId, txs);
+  return txs;
+}
+
+function saveTransactions(shopId: string, txs: Transaction[]) {
+  try {
+    localStorage.setItem(`${STORAGE_KEY_TRANSACTIONS}_${shopId}`, JSON.stringify(txs));
+  } catch {}
 }
 
 export const clientStore = {
@@ -134,6 +165,9 @@ export const clientStore = {
       created_at: newShop.created_at
     };
 
+    // Pre-seed realistic silk saree ledger transactions
+    loadTransactions(shopId);
+
     return { shop: newShop, user };
   },
 
@@ -195,6 +229,40 @@ export const clientStore = {
     const vers = loadVerifications();
     saveVerifications([...vers, verification]);
 
+    if (decision === 'APPROVED') {
+      loadTransactions(existing.id);
+    }
+
     return { shop: updatedShop, verification };
+  },
+
+  // Phase 2 Dashboard APIs
+  getDashboardSummary(shopId: string, period?: DateRangeOption): DashboardSummary {
+    const txs = loadTransactions(shopId);
+    return calculateSummary(txs, period || 'this_month');
+  },
+
+  getDashboardCharts(shopId: string, period?: DateRangeOption): DashboardCharts {
+    const txs = loadTransactions(shopId);
+    return calculateCharts(txs, period || 'this_month');
+  },
+
+  getRecentTransactions(shopId: string, limit = 10, search?: string): Transaction[] {
+    let txs = loadTransactions(shopId);
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      txs = txs.filter(t =>
+        t.invoice_number.toLowerCase().includes(q) ||
+        t.party_name.toLowerCase().includes(q) ||
+        t.type.toLowerCase().includes(q)
+      );
+    }
+    txs = [...txs].sort((a, b) => b.invoice_date.localeCompare(a.invoice_date));
+    return txs.slice(0, limit);
+  },
+
+  getTransactionById(shopId: string, transactionId: string): Transaction | null {
+    const txs = loadTransactions(shopId);
+    return txs.find(t => t.id === transactionId) || null;
   }
 };

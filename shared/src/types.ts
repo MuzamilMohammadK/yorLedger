@@ -74,3 +74,104 @@ export interface UserSession {
   shop: Shop | null;
   latest_verification?: ShopVerification | null;
 }
+
+// -------------------------------------------------------------
+// Phase 2 & 3: Ledger, Parties, Dues, and Dashboard Analytics
+// -------------------------------------------------------------
+
+export type PartyType = 'CUSTOMER' | 'SUPPLIER' | 'ARTISAN';
+export type TransactionType = 'SALE' | 'PURCHASE' | 'JOB_WORK' | 'RETURN';
+export type PaymentStatus = 'PENDING' | 'PARTIAL' | 'SETTLED';
+export type PaymentMode = 'CASH' | 'CHEQUE' | 'NEFT' | 'UPI';
+
+export interface Party {
+  id: string;
+  shop_id: string;
+  name: string;
+  type: PartyType;
+  owner_name?: string | null;
+  gstin?: string | null;
+  phone: string;
+  alt_phone?: string | null;
+  address?: string | null;
+  state_code?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface TransactionItem {
+  id: string;
+  transaction_id: string;
+  item_name: string;
+  quantity: number;
+  rate_paise: number;
+  gst_rate_bp: number;
+  amount_paise: number;
+}
+
+export interface Transaction {
+  id: string;
+  shop_id: string;
+  party_id: string;
+  party_name: string;
+  party_type: PartyType;
+  type: TransactionType;
+  invoice_number: string;
+  invoice_date: string;
+  subtotal_paise: number;
+  tax_paise: number;
+  cgst_paise: number;
+  sgst_paise: number;
+  igst_paise: number;
+  grand_total_paise: number;
+  paid_paise: number;
+  pending_paise: number;
+  status: PaymentStatus;
+  items?: TransactionItem[];
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type DateRangeOption = 'this_month' | 'last_30_days' | 'this_quarter' | 'this_fy' | 'all_time';
+
+export interface DashboardSummary {
+  total_transactions: number;
+  pending_amount: number; // in Rupees
+  settled_amount: number; // in Rupees
+  total_value: number; // in Rupees
+  net_balance: number; // in Rupees (sales - purchases)
+  total_sales: number; // in Rupees
+  total_purchases: number; // in Rupees
+  period: DateRangeOption;
+  period_label: string;
+}
+
+export interface MonthlyComparisonPoint {
+  month: string;
+  sales: number;
+  purchases: number;
+}
+
+export interface SalesTrendPoint {
+  date: string;
+  sales: number;
+  invoices: number;
+}
+
+export interface PendingSettledPoint {
+  name: string;
+  value: number;
+  count: number;
+}
+
+export interface DashboardCharts {
+  sales_vs_purchases: MonthlyComparisonPoint[];
+  sales_trend: SalesTrendPoint[];
+  pending_vs_settled: PendingSettledPoint[];
+  summary: {
+    total_sales: number;
+    total_purchases: number;
+    net_balance: number;
+  };
+}

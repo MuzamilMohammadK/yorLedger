@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Badge } from './ui/Badge';
 import { LogOut, Store, ShieldCheck, Sparkles } from 'lucide-react';
@@ -7,6 +7,21 @@ import { LogOut, Store, ShieldCheck, Sparkles } from 'lucide-react';
 export const Navbar: React.FC = () => {
   const { user, shop, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isDashboardRoute = [
+    '/dashboard',
+    '/parties',
+    '/ledger',
+    '/history',
+    '/dues',
+    '/analytics',
+    '/settings'
+  ].some(p => location.pathname === p || location.pathname.startsWith(`${p}/`));
+
+  if (isDashboardRoute && shop?.status === 'APPROVED') {
+    return null;
+  }
 
   const handleLogout = async () => {
     await logout();

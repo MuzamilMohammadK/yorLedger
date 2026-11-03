@@ -11,7 +11,13 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { PendingApprovalPage } from './pages/PendingApprovalPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { DashboardPlaceholderPage } from './pages/DashboardPlaceholderPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { PartiesPage } from './pages/PartiesPage';
+import { LedgerPage } from './pages/LedgerPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { DuesPage } from './pages/DuesPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export const App: React.FC = () => {
   return (
@@ -33,9 +39,15 @@ export const App: React.FC = () => {
                 <Route path="/admin" element={<AdminDashboardPage />} />
               </Route>
 
-              {/* Merchant Protected Routes */}
+              {/* Merchant Protected Routes (Phase 2 Dashboard & Modules) */}
               <Route element={<ProtectedRoute />}>
-                <Route path="/dashboard" element={<DashboardPlaceholderPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/parties" element={<PartiesPage />} />
+                <Route path="/ledger" element={<LedgerPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/dues" element={<DuesPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Route>
 
