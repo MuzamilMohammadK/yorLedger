@@ -81,25 +81,70 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 function fallbackHandler<T>(endpoint: string, options: RequestInit, token: string | null): T {
   // /auth/me
   if (endpoint === '/auth/me') {
-    let email = 'muzamilmohammadk@gmail.com';
-    let role: 'ADMIN' | 'OWNER' = 'ADMIN';
+    let email = '';
+    let role: 'ADMIN' | 'OWNER' = 'OWNER';
 
-    if (token && token.startsWith('dev-owner-')) {
-      email = token.replace('dev-owner-', '');
-      role = 'OWNER';
-    } else if (token === 'dev-admin') {
-      role = 'ADMIN';
+    // 1. Decode real Firebase JWT
+    if (token && token.includes('.')) {
+      try {
+        const parts = token.split('.');
+        if (parts.length >= 2) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.email) email = payload.email.toLowerCase();
+          if (payload.admin || email === 'muzamilmohammadk@gmail.com') {
+            role = 'ADMIN';
+          }
+        }
+      } catch {}
     }
 
-    const shop = clientStore.getShopByEmail(email);
-    const shopDetails = shop ? clientStore.getShopById(shop.id) : null;
+    // 2. Dev token formats
+    if (!email) {
+      if (token && token.startsWith('dev-owner-')) {
+        email = token.replace('dev-owner-', '').toLowerCase();
+        role = 'OWNER';
+      } else if (token === 'dev-admin') {
+        email = 'muzamilmohammadk@gmail.com';
+        role = 'ADMIN';
+      }
+    }
+
+    // 3. Check dev session storage
+    if (!email) {
+      const saved = localStorage.getItem('yorbalance_dev_session');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.email) email = parsed.email.toLowerCase();
+          if (parsed.role) role = parsed.role;
+        } catch {}
+      }
+    }
+
+    // 4. Retrieve shop by active shop ID or user email
+    const activeShopId = localStorage.getItem('yorbalance_active_shop_id');
+    let shopDetails = activeShopId ? clientStore.getShopById(activeShopId) : null;
+
+    if (!shopDetails && email) {
+      const shop = clientStore.getShopByEmail(email);
+      if (shop) {
+        shopDetails = clientStore.getShopById(shop.id);
+      }
+    }
+
+    if (!shopDetails && role === 'OWNER') {
+      const allShops = clientStore.getShops();
+      if (allShops.length > 0) {
+        shopDetails = clientStore.getShopById(allShops[0].id);
+      }
+    }
 
     return {
       user: {
-        id: shop ? 'user-' + shop.id : 'user-' + (role === 'ADMIN' ? 'admin' : 'owner'),
-        shop_id: shop ? shop.id : null,
-        firebase_uid: shop ? 'uid-' + shop.id : 'uid-' + (role === 'ADMIN' ? 'admin' : 'owner'),
-        email,
+        id: shopDetails ? 'user-' + shopDetails.shop.id : 'user-' + (role === 'ADMIN' ? 'admin' : 'owner'),
+        shop_id: shopDetails ? shopDetails.shop.id : null,
+        firebase_uid: shopDetails ? 'uid-' + shopDetails.shop.id : 'uid-' + (role === 'ADMIN' ? 'admin' : 'owner'),
+        email: email || 'merchant@yorbalance.com',
         role,
         created_at: new Date().toISOString()
       },

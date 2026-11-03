@@ -121,6 +121,9 @@ export const clientStore = {
 
     const updated = existing ? shops.map(s => s.id === existing.id ? newShop : s) : [newShop, ...shops];
     saveShops(updated);
+    try {
+      localStorage.setItem('yorbalance_active_shop_id', newShop.id);
+    } catch {}
 
     const user: User = {
       id: userId,
@@ -175,6 +178,9 @@ export const clientStore = {
     };
 
     saveShops(shops.map(s => s.id === existing!.id ? updatedShop : s));
+    try {
+      localStorage.setItem('yorbalance_active_shop_id', existing.id);
+    } catch {}
 
     const verification: ShopVerification = {
       id: 'ver-' + Date.now(),

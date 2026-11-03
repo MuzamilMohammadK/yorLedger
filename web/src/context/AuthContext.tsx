@@ -264,6 +264,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       const res = await api.registerShop(fullPayload);
+      if (res.shop?.id) {
+        try {
+          localStorage.setItem('yorbalance_active_shop_id', res.shop.id);
+        } catch {}
+      }
       setUser(res.user);
       setShop(res.shop);
       setLatestVerification(null);
