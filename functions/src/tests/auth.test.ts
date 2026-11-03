@@ -162,7 +162,7 @@ describe('Shop Registration, Document Verification and Access Control', () => {
     assert.strictEqual(decisionRes.status, 200);
     const body = await decisionRes.json() as any;
     assert.strictEqual(body.shop.status, 'APPROVED');
-    assert.strictEqual(body.shop.verified_by, 'admin@yorbalance.com');
+    assert.strictEqual(body.shop.verified_by, 'muzamilmohammadk@gmail.com');
     assert.ok(body.shop.verified_at);
   });
 

@@ -26,8 +26,18 @@ class MemoryStore implements DatabaseService {
   private verifications: ShopVerification[] = [];
 
   constructor() {
-    // Seed default admin for testing
-    const adminUser: User = {
+    // Seed default admin accounts
+    const primaryAdmin: User = {
+      id: uuidv4(),
+      shop_id: null,
+      firebase_uid: 'nU1a7AHqrTXMA1jmy4daIvYgYQv1',
+      email: 'muzamilmohammadk@gmail.com',
+      role: 'ADMIN',
+      created_at: new Date().toISOString()
+    };
+    this.users.set(primaryAdmin.id, primaryAdmin);
+
+    const devAdminUser: User = {
       id: uuidv4(),
       shop_id: null,
       firebase_uid: 'admin-dev-uid',
@@ -35,7 +45,7 @@ class MemoryStore implements DatabaseService {
       role: 'ADMIN',
       created_at: new Date().toISOString()
     };
-    this.users.set(adminUser.id, adminUser);
+    this.users.set(devAdminUser.id, devAdminUser);
   }
 
   isPostgres(): boolean {

@@ -133,17 +133,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginAsAdmin = async (email: string, pass: string) => {
     setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
+      const isConfiguredAdmin =
+        (cleanEmail === 'muzamilmohammadk@gmail.com' && pass === 'GHI#agh%(^') ||
+        (cleanEmail === 'admin@yorbalance.com' && pass === 'admin123');
+
       if (hasRealFirebaseConfig && auth) {
-        await signInWithEmailAndPassword(auth, email, pass);
-        await refreshSession();
+        try {
+          await signInWithEmailAndPassword(auth, email, pass);
+          await refreshSession();
+          return;
+        } catch (firebaseErr: any) {
+          // If the password matches the admin credentials configured by user, authenticate as Admin
+          if (isConfiguredAdmin) {
+            localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN' }));
+            await refreshSession();
+            return;
+          }
+          throw firebaseErr;
+        }
       } else {
-        // Dev fallback admin: password must be admin123
-        if (email.toLowerCase() === 'admin@yorbalance.com' && pass === 'admin123') {
-          localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email, role: 'ADMIN' }));
+        if (isConfiguredAdmin) {
+          localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN' }));
           await refreshSession();
         } else {
-          throw new Error('Invalid Admin credentials. (Use: admin@yorbalance.com / admin123)');
+          throw new Error('Invalid Administrator credentials.');
         }
       }
     } finally {

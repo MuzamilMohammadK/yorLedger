@@ -46,7 +46,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (authHeader && authHeader.startsWith('Bearer dev-')) {
     const tokenType = authHeader.replace('Bearer dev-', '');
     if (tokenType === 'admin') {
-      const adminUser = await db.findUserByEmail('admin@yorbalance.com');
+      const adminUser = await db.findUserByEmail('muzamilmohammadk@gmail.com') || await db.findUserByEmail('admin@yorbalance.com');
       if (adminUser) {
         req.user = adminUser;
         req.firebaseUid = adminUser.firebase_uid;
@@ -105,6 +105,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     let user = await db.findUserByFirebaseUid(firebaseUid);
     if (!user && email) {
       user = await db.findUserByEmail(email);
+    }
+
+    // Auto-recognize admin account from Firebase custom claim or admin email
+    if (email?.toLowerCase() === 'muzamilmohammadk@gmail.com') {
+      if (!user) {
+        user = await db.seedAdminUser(email, firebaseUid);
+      } else if (user.role !== 'ADMIN') {
+        user.role = 'ADMIN';
+      }
     }
 
     if (!user && !req.path.endsWith('/register-shop')) {
