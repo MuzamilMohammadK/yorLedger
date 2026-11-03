@@ -139,8 +139,8 @@ function fallbackHandler<T>(endpoint: string, options: RequestInit, token: strin
 
   // /admin/shops/:id/decision
   if (endpoint.includes('/decision') && options.method === 'POST') {
-    const parts = endpoint.split('/');
-    const shopId = parts[2];
+    const match = endpoint.match(/\/admin\/shops\/([^/]+)\/decision/);
+    const shopId = match ? decodeURIComponent(match[1]) : '';
     const payload: AdminDecisionPayload = JSON.parse(options.body as string);
     const result = clientStore.recordDecision(shopId, payload.decision, payload.reason);
     return {
@@ -151,8 +151,9 @@ function fallbackHandler<T>(endpoint: string, options: RequestInit, token: strin
   }
 
   // /admin/shops/:id
-  if (endpoint.startsWith('/admin/shops/') && options.method !== 'POST') {
-    const shopId = endpoint.replace('/admin/shops/', '');
+  if (endpoint.startsWith('/admin/shops/') && !endpoint.includes('/decision') && options.method !== 'POST') {
+    const match = endpoint.match(/\/admin\/shops\/([^/?]+)/);
+    const shopId = match ? decodeURIComponent(match[1]) : '';
     const details = clientStore.getShopById(shopId);
     if (!details) throw new ApiError('Shop not found', 'NOT_FOUND', 404);
     return details as T;

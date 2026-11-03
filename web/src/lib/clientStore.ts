@@ -160,8 +160,11 @@ export const clientStore = {
 
   recordDecision(id: string, decision: 'APPROVED' | 'REJECTED', reason?: string, adminId: string = 'admin'): { shop: Shop; verification: ShopVerification } {
     const shops = loadShops();
-    const existing = shops.find(s => s.id === id);
-    if (!existing) throw new Error('Shop not found');
+    let existing = shops.find(s => s.id === id);
+    if (!existing) {
+      existing = shops.find(s => s.gstin.toLowerCase() === id.toLowerCase() || s.name.toLowerCase() === id.toLowerCase());
+    }
+    if (!existing) throw new Error(`Shop not found`);
 
     const updatedShop: Shop = {
       ...existing,
@@ -171,11 +174,11 @@ export const clientStore = {
       updated_at: new Date().toISOString()
     };
 
-    saveShops(shops.map(s => s.id === id ? updatedShop : s));
+    saveShops(shops.map(s => s.id === existing!.id ? updatedShop : s));
 
     const verification: ShopVerification = {
       id: 'ver-' + Date.now(),
-      shop_id: id,
+      shop_id: existing.id,
       submitted_details: { name: existing.name, gstin: existing.gstin },
       decision,
       reason: decision === 'REJECTED' ? (reason || null) : null,
