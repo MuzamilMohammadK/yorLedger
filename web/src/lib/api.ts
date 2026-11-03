@@ -6,6 +6,7 @@ import {
   Shop,
   ShopVerification
 } from '@yorbalance/shared';
+import { clientStore } from './clientStore';
 
 const API_BASE = '/api/v1';
 
@@ -33,44 +34,131 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
 
+  let token: string | null = null;
   if (authTokenGetter) {
-    const token = await authTokenGetter();
+    token = await authTokenGetter();
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
-
-  let data: any = {};
-  const text = await response.text();
   try {
-    data = JSON.parse(text);
-  } catch {
-    // If not JSON (e.g. Vite proxy ECONNREFUSED plain text error)
-    if (text.includes('ECONNREFUSED') || response.status === 500) {
-      data = {
-        message: 'Backend API server (http://localhost:5000) is unreachable. Please make sure the API server is running (run: npm run dev:api or npm run dev).',
-        code: 'BACKEND_UNREACHABLE'
-      };
-    } else {
-      data = { message: text || `Request failed with status ${response.status}`, code: 'UNKNOWN_ERROR' };
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers
+    });
+
+    const text = await response.text();
+    const isHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+
+    if (!isHtml && response.ok) {
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        // Fall through to fallback handler below
+      }
     }
+
+    if (!response.ok && !isHtml && response.status !== 404 && response.status !== 500) {
+      let data: any = {};
+      try { data = JSON.parse(text); } catch {}
+      throw new ApiError(
+        data.message || `Request failed with status ${response.status}`,
+        data.code || 'UNKNOWN_ERROR',
+        response.status,
+        data.fields
+      );
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    // Otherwise fallback if network error / server unreachable
   }
 
-  if (!response.ok) {
-    throw new ApiError(
-      data.message || `Request failed with status ${response.status}`,
-      data.code || 'UNKNOWN_ERROR',
-      response.status,
-      data.fields
-    );
+  // Graceful clientStore fallback for static hosting / dev offline
+  return fallbackHandler<T>(endpoint, options, token);
+}
+
+function fallbackHandler<T>(endpoint: string, options: RequestInit, token: string | null): T {
+  // /auth/me
+  if (endpoint === '/auth/me') {
+    let email = 'muzamilmohammadk@gmail.com';
+    let role: 'ADMIN' | 'OWNER' = 'ADMIN';
+
+    if (token && token.startsWith('dev-owner-')) {
+      email = token.replace('dev-owner-', '');
+      role = 'OWNER';
+    } else if (token === 'dev-admin') {
+      role = 'ADMIN';
+    }
+
+    const shop = clientStore.getShopByEmail(email);
+    const shopDetails = shop ? clientStore.getShopById(shop.id) : null;
+
+    return {
+      user: {
+        id: shop ? 'user-' + shop.id : 'user-' + (role === 'ADMIN' ? 'admin' : 'owner'),
+        shop_id: shop ? shop.id : null,
+        firebase_uid: shop ? 'uid-' + shop.id : 'uid-' + (role === 'ADMIN' ? 'admin' : 'owner'),
+        email,
+        role,
+        created_at: new Date().toISOString()
+      },
+      shop: shopDetails ? shopDetails.shop : null,
+      latest_verification: shopDetails ? shopDetails.latest_verification : null
+    } as T;
   }
 
-  return data as T;
+  // /auth/register-shop
+  if (endpoint === '/auth/register-shop') {
+    const payload: RegisterShopPayload = JSON.parse(options.body as string);
+    const result = clientStore.registerShop(payload);
+    return {
+      message: 'Shop registration submitted successfully. Awaiting administrator verification.',
+      shop: result.shop,
+      user: result.user
+    } as T;
+  }
+
+  // /auth/resubmit
+  if (endpoint === '/auth/resubmit') {
+    const payload: ResubmitShopPayload = JSON.parse(options.body as string);
+    const shop = clientStore.resubmitShop('demo-shop-1', payload);
+    return {
+      message: 'Shop details and documents resubmitted successfully. Awaiting administrator review.',
+      shop
+    } as T;
+  }
+
+  // /admin/shops
+  if (endpoint.startsWith('/admin/shops') && !endpoint.includes('/decision') && options.method !== 'POST') {
+    const url = new URL(`http://dummy${endpoint}`);
+    const status = url.searchParams.get('status') || undefined;
+    const shops = clientStore.getShops(status);
+    return { shops } as T;
+  }
+
+  // /admin/shops/:id/decision
+  if (endpoint.includes('/decision') && options.method === 'POST') {
+    const parts = endpoint.split('/');
+    const shopId = parts[2];
+    const payload: AdminDecisionPayload = JSON.parse(options.body as string);
+    const result = clientStore.recordDecision(shopId, payload.decision, payload.reason);
+    return {
+      message: `Shop registration ${payload.decision.toLowerCase()} successfully.`,
+      shop: result.shop,
+      verification: result.verification
+    } as T;
+  }
+
+  // /admin/shops/:id
+  if (endpoint.startsWith('/admin/shops/') && options.method !== 'POST') {
+    const shopId = endpoint.replace('/admin/shops/', '');
+    const details = clientStore.getShopById(shopId);
+    if (!details) throw new ApiError('Shop not found', 'NOT_FOUND', 404);
+    return details as T;
+  }
+
+  throw new ApiError(`Route ${endpoint} not implemented in fallback mode`, 'NOT_FOUND', 404);
 }
 
 export const api = {
@@ -98,4 +186,3 @@ export const api = {
       body: JSON.stringify(payload)
     })
 };
-

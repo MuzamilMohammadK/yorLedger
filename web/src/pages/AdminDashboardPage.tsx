@@ -41,7 +41,7 @@ export const AdminDashboardPage: React.FC = () => {
       setLoading(true);
       const filter = statusFilter === 'ALL' ? undefined : statusFilter;
       const res = await api.getAdminShops(filter);
-      setShops(res.shops);
+      setShops(res?.shops || []);
     } catch (err: any) {
       console.error('Failed to load admin shops:', err);
     } finally {

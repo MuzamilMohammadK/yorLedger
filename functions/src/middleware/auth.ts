@@ -46,7 +46,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (authHeader && authHeader.startsWith('Bearer dev-')) {
     const tokenType = authHeader.replace('Bearer dev-', '');
     if (tokenType === 'admin') {
-      const adminUser = await db.findUserByEmail('muzamilmohammadk@gmail.com') || await db.findUserByEmail('admin@yorbalance.com');
+      let adminUser = await db.findUserByEmail('muzamilmohammadk@gmail.com') || await db.findUserByEmail('admin@yorbalance.com');
+      if (!adminUser) {
+        adminUser = await db.seedAdminUser('muzamilmohammadk@gmail.com', 'DHiaM4ITGIPoR9YgB3YJaHycOv13');
+      }
       if (adminUser) {
         req.user = adminUser;
         req.firebaseUid = adminUser.firebase_uid;

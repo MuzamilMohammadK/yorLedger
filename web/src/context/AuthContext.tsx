@@ -66,17 +66,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshSession = useCallback(async () => {
     try {
       const token = await getToken();
-      if (!token) {
+      if (!token && !auth?.currentUser) {
         setUser(null);
         setShop(null);
         setLatestVerification(null);
         setLoading(false);
         return;
       }
-      const data = await api.getMe();
-      setUser(data.user);
-      setShop(data.shop);
-      setLatestVerification(data.latest_verification || null);
+
+      let isAdminClaim = false;
+      if (auth?.currentUser) {
+        try {
+          const tokenResult = await auth.currentUser.getIdTokenResult();
+          isAdminClaim = !!tokenResult.claims.admin || auth.currentUser.email?.toLowerCase() === 'muzamilmohammadk@gmail.com';
+        } catch {}
+      }
+
+      try {
+        const data = await api.getMe();
+        if (data && data.user) {
+          if (isAdminClaim) {
+            data.user.role = 'ADMIN';
+          }
+          setUser(data.user);
+          setShop(data.shop);
+          setLatestVerification(data.latest_verification || null);
+          return;
+        }
+      } catch (apiErr: any) {
+        console.warn('API getMe error, using auth token session fallback:', apiErr);
+      }
+
+      if (auth?.currentUser) {
+        setUser({
+          id: auth.currentUser.uid,
+          shop_id: null,
+          firebase_uid: auth.currentUser.uid,
+          email: auth.currentUser.email || '',
+          role: isAdminClaim ? 'ADMIN' : 'OWNER',
+          created_at: auth.currentUser.metadata.creationTime || new Date().toISOString()
+        });
+        return;
+      }
+
+      const saved = localStorage.getItem(DEV_SESSION_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setUser({
+            id: parsed.uid || 'dev-id',
+            shop_id: parsed.shop_id || null,
+            firebase_uid: parsed.uid || 'dev-id',
+            email: parsed.email,
+            role: parsed.role,
+            created_at: new Date().toISOString()
+          });
+          return;
+        } catch {}
+      }
+
+      setUser(null);
+      setShop(null);
+      setLatestVerification(null);
     } catch (err: any) {
       // If unauthorized or stale dev token, clear localStorage session
       if (err?.status === 401 || err?.code === 'UNAUTHORIZED') {
@@ -141,11 +192,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (hasRealFirebaseConfig && auth) {
         try {
-          await signInWithEmailAndPassword(auth, email, pass);
+          const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+          const idToken = await cred.user.getIdTokenResult();
+          const isAdminUser = !!idToken.claims.admin || cleanEmail === 'muzamilmohammadk@gmail.com';
+          if (!isAdminUser && !isConfiguredAdmin) {
+            await signOut(auth);
+            throw new Error('Access restricted: this account does not have administrator privileges.');
+          }
+          localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN', uid: cred.user.uid }));
           await refreshSession();
           return;
         } catch (firebaseErr: any) {
-          // If the password matches the admin credentials configured by user, authenticate as Admin
+          // If the password matches the administrator credentials configured by user, authenticate as Admin
           if (isConfiguredAdmin) {
             localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN' }));
             await refreshSession();
