@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageCircle, Undo2, Trash2, AlertTriangle } from 'lucide-react';
+import { MessageCircle, Undo2, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { formatPaiseToINR, Transaction } from '@yorbalance/shared';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n';
@@ -10,6 +10,7 @@ import { billMessage, openWhatsApp } from '../../lib/whatsapp';
 import { Sheet } from '../ledger/NewTransactionModal';
 import { AddReturnModal } from '../history/AddReturnModal';
 import { useShell } from '../layout/AppShell';
+import { shareBillPdf } from '../../lib/pdf';
 
 /** Everything about one bill, with the actions a shop needs. */
 export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void }> = ({ bill, onClose }) => {
@@ -143,6 +144,10 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
                   <MessageCircle className="w-5 h-5" /> {t('whatsapp')}
                 </button>
               )}
+              <button onClick={() => shop && shareBillPdf(shop, bill).catch(e => setError(e.message))}
+                className="h-12 rounded-xl border-2 border-slate-300 text-base font-bold text-slate-800 flex items-center justify-center gap-2">
+                <FileText className="w-5 h-5" /> {t('share_pdf')}
+              </button>
               {canReturn && (
                 <button onClick={() => setReturnOpen(true)}
                   className="h-12 rounded-xl border-2 border-slate-300 text-base font-bold text-slate-800 flex items-center justify-center gap-2">

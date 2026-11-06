@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n, LANGUAGES, Lang } from '../i18n';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Badge } from './ui/Badge';
@@ -6,6 +7,7 @@ import { LogOut, Store, ShieldCheck, Sparkles } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, shop, isAdmin, logout } = useAuth();
+  const { lang, setLang } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -42,9 +44,7 @@ export const Navbar: React.FC = () => {
               <span className="font-serif-display text-xl font-bold tracking-tight text-brand-950 block leading-tight">
                 YorLedger
               </span>
-              <span className="text-sm font-semibold uppercase tracking-wider text-amber-700 block">
-                Saree & Silk Ledger
-              </span>
+              
             </div>
           </Link>
 
@@ -82,20 +82,10 @@ export const Navbar: React.FC = () => {
             )}
 
             {!user && (
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/admin-login"
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5"
-                >
-                  Admin Portal
-                </Link>
-                <Link
-                  to="/login"
-                  className="text-sm font-semibold bg-brand-900 text-white px-3.5 py-1.5 rounded-lg hover:bg-brand-950 transition-colors"
-                >
-                  Merchant Sign In
-                </Link>
-              </div>
+              <select value={lang} onChange={e => setLang(e.target.value as Lang)} aria-label="Language"
+                className="h-11 px-3 rounded-xl border-2 border-slate-200 bg-white text-base font-semibold text-slate-800">
+                {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+              </select>
             )}
           </div>
         </div>

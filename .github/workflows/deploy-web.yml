@@ -1,0 +1,38 @@
+name: Deploy website + Firestore rules
+
+# Needs repository secret FIREBASE_SERVICE_ACCOUNT (JSON of a service account with
+# Firebase Hosting Admin + Firebase Rules Admin + Cloud Datastore Index Admin).
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'shared/**', 'firestore.rules', 'firestore.indexes.json', 'firebase.json']
+  workflow_dispatch:
+
+concurrency: deploy-web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - if: env.HAS_KEY != 'true'
+        run: echo "::warning::FIREBASE_SERVICE_ACCOUNT secret not set — skipping deploy."
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: env.HAS_KEY == 'true'
+        run: npm ci && npm test && npm run build
+      - name: Deploy hosting, Firestore rules and indexes
+        if: env.HAS_KEY == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@15.34.1 deploy --only hosting,firestore --project yorledger-fbb71 --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"

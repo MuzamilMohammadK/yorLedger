@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useI18n } from '../i18n';
+import { canUseGoogleSignIn } from '../lib/platform';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Input } from '../components/ui/Input';
@@ -15,6 +17,7 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { loginWithEmail, loginWithGoogle, user, shop } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   // If already logged in, redirect appropriately
@@ -72,16 +75,16 @@ export const LoginPage: React.FC = () => {
           YorLedger
         </h2>
         <p className="mt-1 text-sm text-slate-600 font-medium">
-          Digital Ledger & GST Billing for Saree & Silk Merchants
+          {t('tagline')}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/60 rounded-3xl border border-slate-100 sm:px-10">
           <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-900">Merchant Sign In</h3>
+            <h3 className="text-xl font-bold text-slate-900">{t('login_title')}</h3>
             <p className="text-sm text-slate-500 mt-0.5">
-              Access your shop's ledger, customer dues, and tax registers
+              {t('login_sub')}
             </p>
           </div>
 
@@ -91,10 +94,10 @@ export const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Email Address"
+              label={t('email')}
               type="email"
               autoComplete="email"
-              placeholder="e.g. owner@kanchisilks.com"
+              placeholder="owner@shop.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               leftIcon={<Mail className="w-4 h-4" />}
@@ -103,7 +106,7 @@ export const LoginPage: React.FC = () => {
 
             <div>
               <Input
-                label="Password"
+                label={t('password')}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 placeholder="••••••••"
@@ -132,14 +135,14 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-300 text-brand-900 focus:ring-brand-800 h-4 w-4"
                 />
-                Remember me
+                {t('remember')}
               </label>
 
               <Link
                 to="/forgot-password"
                 className="font-semibold text-brand-900 hover:text-brand-700 hover:underline"
               >
-                Forgot password?
+                {t('forgot')}
               </Link>
             </div>
 
@@ -150,11 +153,12 @@ export const LoginPage: React.FC = () => {
               className="w-full mt-2"
               isLoading={isLoading}
             >
-              Sign In to Ledger
+              {t('sign_in')}
             </Button>
           </form>
 
-          {/* Social Divider */}
+          {/* Social sign-in: website only (Google blocks its popup inside apps) */}
+          {canUseGoogleSignIn && (
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -196,16 +200,17 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Quick Demo Fill for evaluation */}
           <div className="mt-6 pt-5 border-t border-slate-100 bg-amber-50/50 -mx-6 -mb-8 px-6 py-4 rounded-b-3xl">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-amber-900">New Shop?</span>
+              <span className="font-semibold text-amber-900">{t('new_shop')}</span>
               <Link
                 to="/register-shop"
                 className="font-bold text-brand-900 hover:text-brand-950 flex items-center gap-1"
               >
-                Register Shop <ArrowRight className="w-3.5 h-3.5" />
+                {t('register_shop')} <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
@@ -216,7 +221,7 @@ export const LoginPage: React.FC = () => {
             to="/admin-login"
             className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
           >
-            Looking for Administrator Portal? Click here
+            {t('admin_link')}
           </Link>
         </div>
       </div>

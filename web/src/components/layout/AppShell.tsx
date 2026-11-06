@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Home, Users, Plus, Wallet, Menu, ScrollText, BarChart3, Settings, LogOut, Bell, Languages, X } from 'lucide-react';
 import { BillKind, Party, formatPaiseToINR } from '@yorbalance/shared';
@@ -9,6 +9,8 @@ import { useAlerts, useLive } from '../../lib/useLiveData';
 import { NewTransactionModal, DraftBill, Sheet } from '../ledger/NewTransactionModal';
 import { RecordPaymentModal } from '../dues/RecordPaymentModal';
 import { ScanBillSheet } from '../scan/ScanBillSheet';
+import { startReminders } from '../../lib/reminders';
+import { isAndroidApp } from '../../lib/platform';
 
 interface ShellApi {
   openNewBill: (opts?: { partyId?: string; kind?: BillKind; draft?: Partial<DraftBill> }) => void;
@@ -47,6 +49,22 @@ export const AppShell: React.FC = () => {
   const { data: partyData } = useLive(() => api.getParties(), []);
   const parties: Party[] = partyData?.parties ?? [];
   const { alerts, unread, markRead } = useAlerts(isApproved);
+
+  // Due reminders as phone / desktop notifications, in the chosen language.
+  useEffect(() => (isApproved ? startReminders(t) : undefined), [isApproved, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tapping a reminder on Android opens that bill.
+  useEffect(() => {
+    if (!isAndroidApp) return;
+    let remove: (() => void) | undefined;
+    import('@capacitor/local-notifications').then(({ LocalNotifications }) =>
+      LocalNotifications.addListener('localNotificationActionPerformed', a => {
+        const id = a.notification.extra?.billId;
+        if (id) navigate(`/history?bill=${id}`);
+      }).then(h => { remove = () => h.remove(); })
+    );
+    return () => remove?.();
+  }, [navigate]);
 
   const shell: ShellApi = {
     openNewBill: (o = {}) => {

@@ -61,6 +61,29 @@ access is controlled by `firestore.rules`.
    ```
    Keep `service-account.json` out of git. It is ignored.
 
+## Apps and releases
+
+| Platform | How it is built | Where |
+| --- | --- | --- |
+| Website | `npm run build` → Firebase Hosting | `deploy-web.yml` on every push to `main` (needs secret `FIREBASE_SERVICE_ACCOUNT`) |
+| Android APK | Capacitor (`web/android`) | `release.yml` |
+| Windows / macOS / Linux | Electron (`desktop/`) | `release.yml` |
+
+**Make a release:** `git tag v1.0.0 && git push origin v1.0.0`. GitHub Actions builds the APK, installers and a web zip,
+then publishes them as a GitHub Release. Tags starting with `v0.` are marked as pre-releases.
+
+- APK signing: add secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+  Without them the APK is signed with a debug key: it installs fine, but you cannot later switch to a real key
+  without users reinstalling. Create the real key before sharing the APK widely.
+- Desktop builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper show a warning on first launch.
+
+Local runs: `npm run dev` (website) · `cd desktop && npm start` (desktop, after `npm run build`) ·
+`cd web && npx cap sync android && npx cap open android` (Android Studio).
+
+### Reminders
+Bills with a reminder date notify at **08:00 IST** on *remind date − lead days* while money is due, once per bill and date.
+On Android they are scheduled on the phone and fire even when the app is closed. On desktop and the website they appear while the app is open.
+
 ## Translations
 
 The Telugu, Tamil, Kannada and Hindi strings in `web/src/i18n/strings.ts` were drafted

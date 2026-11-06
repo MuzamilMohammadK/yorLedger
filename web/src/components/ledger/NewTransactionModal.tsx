@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Plus, Trash2, ShoppingBag, Truck, Scissors, Loader2, CheckCircle2, ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Search, UserPlus, Camera } from 'lucide-react';
+import { X, Plus, Trash2, ShoppingBag, Truck, Scissors, Loader2, CheckCircle2, ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Search, UserPlus, Camera, FileText } from 'lucide-react';
 import { BillKind, Party, Transaction, computeTax, formatPaiseToINR, normalizeInvoice } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n } from '../../i18n';
 import { todayIST } from '../../lib/data/util';
 import { billMessage, openWhatsApp } from '../../lib/whatsapp';
+import { shareBillPdf } from '../../lib/pdf';
 
 interface NewTransactionModalProps {
   isOpen: boolean;
@@ -208,6 +209,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               <MessageCircle className="w-6 h-6" /> {t('share_whatsapp')}
             </button>
           )}
+          {shop && (
+            <button onClick={() => shareBillPdf(shop, saved).catch(e => setFormError(e.message))}
+              className="w-full h-14 rounded-2xl border-2 border-indigo-300 bg-indigo-50 text-indigo-800 text-lg font-bold flex items-center justify-center gap-2">
+              <FileText className="w-6 h-6" /> {t('share_pdf')}
+            </button>
+          )}
+          {formError && <p className="text-base text-rose-700">{formError}</p>}
           <button onClick={onClose} className="w-full h-14 rounded-2xl border-2 border-slate-300 text-lg font-bold text-slate-700">
             {t('done')}
           </button>

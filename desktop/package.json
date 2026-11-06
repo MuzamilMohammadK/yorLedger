@@ -1,0 +1,29 @@
+{
+  "name": "yorledger-desktop",
+  "productName": "YorLedger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YorLedger desktop app (Windows, macOS, Linux)",
+  "main": "main.cjs",
+  "author": "YorLedger",
+  "scripts": {
+    "copy-web": "node scripts/copy-web.cjs",
+    "start": "npm run copy-web && electron .",
+    "dist": "npm run copy-web && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.10.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.yorledger.app",
+    "productName": "YorLedger",
+    "artifactName": "YorLedger-${version}-${os}-${arch}.${ext}",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["main.cjs", "preload.cjs", "app/**/*", "package.json"],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true },
+    "mac": { "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }], "icon": "build/icon.png", "category": "public.app-category.finance" },
+    "linux": { "target": ["AppImage", "deb"], "icon": "build/icon.png", "category": "Office", "maintainer": "YorLedger" }
+  }
+}

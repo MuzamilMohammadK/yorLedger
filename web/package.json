@@ -12,9 +12,15 @@
     "prebuild": "node scripts/copy-ocr-assets.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
     "@tesseract.js-data/eng": "^1.0.0",
     "@yorbalance/shared": "*",
     "firebase": "^11.1.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -23,6 +29,7 @@
     "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
