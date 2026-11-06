@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Truck, ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Bell } from 'lucide-react';
+import { ShoppingBag, Truck, ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronUp, Bell, Camera } from 'lucide-react';
 import { formatPaiseToINR } from '@yorbalance/shared';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n';
@@ -59,6 +59,11 @@ export const DashboardPage: React.FC = () => {
           </button>
         ))}
       </div>
+
+      <button onClick={shell.openScan}
+        className="w-full h-14 rounded-2xl border-2 border-indigo-300 bg-white text-indigo-800 text-lg font-bold flex items-center justify-center gap-2">
+        <Camera className="w-6 h-6" /> {t('scan_bill')}
+      </button>
 
       {/* Simple totals */}
       <div className="grid grid-cols-3 gap-2 text-center">

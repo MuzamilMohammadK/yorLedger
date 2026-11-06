@@ -8,10 +8,12 @@ import { api } from '../../lib/api';
 import { useAlerts, useLive } from '../../lib/useLiveData';
 import { NewTransactionModal, DraftBill, Sheet } from '../ledger/NewTransactionModal';
 import { RecordPaymentModal } from '../dues/RecordPaymentModal';
+import { ScanBillSheet } from '../scan/ScanBillSheet';
 
 interface ShellApi {
   openNewBill: (opts?: { partyId?: string; kind?: BillKind; draft?: Partial<DraftBill> }) => void;
   openPayment: (billId: string) => void;
+  openScan: () => void;
 }
 const ShellContext = createContext<ShellApi | null>(null);
 export const useShell = () => {
@@ -40,6 +42,7 @@ export const AppShell: React.FC = () => {
   const [billOpts, setBillOpts] = useState<{ partyId?: string; draft?: Partial<DraftBill> | null }>({});
   const [payBill, setPayBill] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const { data: partyData } = useLive(() => api.getParties(), []);
   const parties: Party[] = partyData?.parties ?? [];
@@ -50,7 +53,8 @@ export const AppShell: React.FC = () => {
       setBillOpts({ partyId: o.partyId, draft: o.draft ?? (o.kind ? { kind: o.kind } : null) });
       setBillOpen(true);
     },
-    openPayment: id => setPayBill(id)
+    openPayment: id => setPayBill(id),
+    openScan: () => { setBillOpen(false); setScanOpen(true); }
   };
 
   const rs = (p: number) => formatPaiseToINR(p, true);
@@ -194,6 +198,13 @@ export const AppShell: React.FC = () => {
         preselectedPartyId={billOpts.partyId}
         draft={billOpts.draft}
         onNavigateToNewParty={() => navigate('/parties?new=1')}
+        onScan={shell.openScan}
+      />
+      <ScanBillSheet
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        parties={parties}
+        onContinue={(partyId, draft) => { setScanOpen(false); shell.openNewBill({ partyId, draft }); }}
       />
       <RecordPaymentModal
         isOpen={!!payBill}

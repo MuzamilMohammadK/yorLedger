@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Plus, Trash2, ShoppingBag, Truck, Scissors, Loader2, CheckCircle2, ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Search, UserPlus } from 'lucide-react';
+import { X, Plus, Trash2, ShoppingBag, Truck, Scissors, Loader2, CheckCircle2, ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Search, UserPlus, Camera } from 'lucide-react';
 import { BillKind, Party, Transaction, computeTax, formatPaiseToINR, normalizeInvoice } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +14,8 @@ interface NewTransactionModalProps {
   parties: Party[];
   preselectedPartyId?: string | null;
   onNavigateToNewParty?: () => void;
+  /** Open the camera scanner. */
+  onScan?: () => void;
   /** Pre-filled draft, e.g. from a scanned invoice. */
   draft?: Partial<DraftBill> | null;
 }
@@ -46,7 +48,7 @@ function toPaise(v: string): number | null {
 }
 
 export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
-  isOpen, onClose, onSuccess, parties, preselectedPartyId, onNavigateToNewParty, draft
+  isOpen, onClose, onSuccess, parties, preselectedPartyId, onNavigateToNewParty, onScan, draft
 }) => {
   const { shop } = useAuth();
   const { t } = useI18n();
@@ -223,6 +225,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" /> {formError}
           </div>
         )}
+
+        {onScan && !draft?.items?.length && (
+          <button type="button" onClick={onScan}
+            className="w-full h-14 rounded-2xl border-2 border-indigo-300 bg-indigo-50 text-indigo-800 text-lg font-bold flex items-center justify-center gap-2">
+            <Camera className="w-6 h-6" /> {t('scan_bill')}
+          </button>
+        )}
+        {draft?.items?.length ? (
+          <p className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-base text-amber-900">{t('filled_from_scan')}</p>
+        ) : null}
 
         {/* What happened: Sold / Bought / Job work */}
         <div className="grid grid-cols-3 gap-2">

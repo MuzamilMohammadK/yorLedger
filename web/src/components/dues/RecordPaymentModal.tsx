@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Banknote, Landmark, Receipt, Loader2, AlertTriangle } from 'lucide-react';
-import { Party, PaymentPayload, Transaction, formatPaiseToINR } from '@yorbalance/shared';
+import React, { useEffect, useRef, useState } from 'react';
+import { Banknote, Landmark, Receipt, Loader2, AlertTriangle, Camera } from 'lucide-react';
+import { Party, PaymentPayload, Transaction, formatPaiseToINR, parsePaymentText } from '@yorbalance/shared';
+import { readImage } from '../../lib/ocr';
 import { api, ApiError } from '../../lib/api';
 import { useI18n } from '../../i18n';
 import { todayIST } from '../../lib/data/util';
@@ -51,6 +52,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState<number | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen || !initialTransactionId) return;
@@ -81,6 +85,28 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const err = (k: string) => errors[k] && <p className="mt-1 text-sm text-rose-600">{errors[k]}</p>;
   const paise = toPaise(amount);
   const tooMuch = bill && paise !== null && paise > bill.pending_paise;
+
+  // Read a cheque photo or a bank / UPI screenshot and fill what we can.
+  const onScanFile = async (f?: File) => {
+    if (!f || !bill) return;
+    setScanNote(null);
+    setScanning(0);
+    try {
+      const { text } = await readImage(f, 'payment', setScanning);
+      const r = parsePaymentText(text);
+      if (!r.mode && !r.amount && !r.date) { setScanNote(t('nothing_found')); return; }
+      if (r.mode) setMode(r.mode);
+      if (r.amount && r.amount <= bill.pending_paise) setAmount((r.amount / 100).toFixed(2).replace(/\.00$/, ''));
+      if (r.utr) setUtr(r.utr);
+      if (r.chequeNo) setChequeNo(r.chequeNo);
+      if (r.date) setDate(r.date);
+      setScanNote(t('filled_from_scan'));
+    } catch {
+      setScanNote(t('read_fail'));
+    } finally {
+      setScanning(null);
+    }
+  };
 
   const save = async () => {
     if (!bill) return;
@@ -129,6 +155,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               <p className="text-sm opacity-80">{incoming ? t('balance_due') : t('balance_to_pay')}</p>
               <p className="text-3xl font-bold">{rs(bill.pending_paise)}</p>
             </div>
+
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { onScanFile(e.target.files?.[0]); e.target.value = ''; }} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={scanning !== null}
+              className="w-full h-12 rounded-xl border-2 border-indigo-300 bg-indigo-50 text-indigo-800 text-base font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+              {scanning !== null
+                ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('reading')} {Math.round(scanning * 100)}%</>
+                : <><Camera className="w-5 h-5" /> {t('scan_proof')}</>}
+            </button>
+            {scanNote && <p className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-base text-amber-900">{scanNote}</p>}
 
             <div>
               <p className="text-base font-semibold text-slate-800 mb-2">{t('how_paid')}</p>
