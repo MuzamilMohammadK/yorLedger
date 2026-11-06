@@ -44,7 +44,7 @@ export const ForgotPasswordPage: React.FC = () => {
         <h2 className="font-serif-display text-2xl font-bold text-slate-900">
           Reset Your Password
         </h2>
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-sm text-slate-600">
           We will send secure instructions to reset your shop ledger password
         </p>
       </div>
@@ -57,7 +57,7 @@ export const ForgotPasswordPage: React.FC = () => {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-slate-900 mb-1">Check Your Email</h3>
-              <p className="text-xs text-slate-600 mb-6">
+              <p className="text-sm text-slate-600 mb-6">
                 We've sent a password reset link to <strong className="text-slate-800">{email}</strong>. Follow the instructions to create a new password.
               </p>
               <Link to="/login">
@@ -93,7 +93,7 @@ export const ForgotPasswordPage: React.FC = () => {
               <div className="pt-3 text-center">
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
                 </Link>

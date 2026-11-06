@@ -34,7 +34,7 @@ const COLORS = {
 const CustomINRTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900 text-white text-xs p-3 rounded-2xl shadow-xl border border-slate-700 min-w-[150px]">
+      <div className="bg-slate-900 text-white text-sm p-3 rounded-2xl shadow-xl border border-slate-700 min-w-[150px]">
         <p className="font-bold border-b border-slate-700 pb-1 mb-2 text-slate-300">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={`item-${index}`} className="flex items-center justify-between gap-3 py-0.5">
@@ -84,7 +84,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
       <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 rounded-3xl p-5 text-white border border-slate-800 shadow-xl shadow-purple-950/10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-purple-300">
+            <span className="text-sm font-bold uppercase tracking-widest text-purple-300">
               Transaction Balance Overview
             </span>
             <h3 className="text-base font-serif-display font-bold text-white mt-0.5">
@@ -92,23 +92,23 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
             </h3>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-sm">
             <div className="bg-slate-800/80 rounded-2xl px-4 py-2 border border-slate-700">
-              <span className="text-slate-400 block text-[10px] font-semibold uppercase">Total Sales Turnover</span>
+              <span className="text-slate-400 block text-sm font-semibold uppercase">Total Sales Turnover</span>
               <strong className="text-sm sm:text-base text-emerald-400 font-serif-display">
                 {formatINR(summary.total_sales)}
               </strong>
             </div>
 
             <div className="bg-slate-800/80 rounded-2xl px-4 py-2 border border-slate-700">
-              <span className="text-slate-400 block text-[10px] font-semibold uppercase">Purchases & Job Work</span>
+              <span className="text-slate-400 block text-sm font-semibold uppercase">Purchases & Job Work</span>
               <strong className="text-sm sm:text-base text-amber-400 font-serif-display">
                 {formatINR(summary.total_purchases)}
               </strong>
             </div>
 
             <div className="bg-slate-800/80 rounded-2xl px-4 py-2 border border-slate-700">
-              <span className="text-slate-400 block text-[10px] font-semibold uppercase">Net Operating Surplus</span>
+              <span className="text-slate-400 block text-sm font-semibold uppercase">Net Operating Surplus</span>
               <strong className={`text-sm sm:text-base font-serif-display ${summary.net_balance >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
                 {formatINR(summary.net_balance)}
               </strong>
@@ -128,11 +128,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Sales vs Purchases Comparison</h4>
-                <p className="text-[11px] text-slate-500">Monthly breakdown of gross revenue against procurement in INR</p>
+                <p className="text-sm text-slate-500">Monthly breakdown of gross revenue against procurement in INR</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 text-xs font-semibold">
+            <div className="flex items-center gap-3 text-sm font-semibold">
               <span className="flex items-center gap-1.5 text-slate-600">
                 <span className="w-2.5 h-2.5 rounded-sm bg-purple-600" /> Sales
               </span>
@@ -188,7 +188,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Dues vs Clearances</h4>
-                <p className="text-[11px] text-slate-500">Settled collections vs pending dues</p>
+                <p className="text-sm text-slate-500">Settled collections vs pending dues</p>
               </div>
             </div>
           </div>
@@ -212,14 +212,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recovery</span>
+              <span className="text-sm font-bold uppercase tracking-wider text-slate-400">Recovery</span>
               <span className="text-lg font-serif-display font-extrabold text-slate-900">
                 {Math.round((pending_vs_settled[0]?.value / totalDuesAndSettled) * 100)}%
               </span>
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
+          <div className="space-y-2 pt-2 border-t border-slate-100 text-sm">
             {pending_vs_settled.map((item, idx) => {
               const isSettled = item.name === 'Settled';
               const percent = Math.round((item.value / totalDuesAndSettled) * 100);
@@ -234,7 +234,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-slate-900 block font-mono">{formatINR(item.value)}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">{percent}% ({item.count} bills)</span>
+                    <span className="text-sm text-slate-400 font-semibold">{percent}% ({item.count} bills)</span>
                   </div>
                 </div>
               );
@@ -252,10 +252,10 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
             </div>
             <div>
               <h4 className="text-sm font-bold text-slate-900">Sales Velocity Trend</h4>
-              <p className="text-[11px] text-slate-500">Invoice volume and sales billing timeline for selected period</p>
+              <p className="text-sm text-slate-500">Invoice volume and sales billing timeline for selected period</p>
             </div>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 self-start sm:self-auto">
+          <span className="text-sm font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 self-start sm:self-auto">
             Live Daily Velocity
           </span>
         </div>

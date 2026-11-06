@@ -14,7 +14,7 @@ import { cache } from './data/cache';
 import { compute } from './data/compute';
 import * as session from './data/session';
 import * as ledger from './data/ledger';
-import { AppError } from './data/util';
+import { AppError, todayIST } from './data/util';
 
 /** Kept as the public error type for screens (code, message, fields, status). */
 export { AppError as ApiError };
@@ -226,6 +226,44 @@ export const api = {
   exportShopData: async (type: 'transactions' | 'parties' | 'reports') => {
     const s = await shopReady();
     return compute.exportShopData(s.id, type).data;
+  },
+
+  /** Every live bill (exact paise), newest first. */
+  getAllBills: async () => {
+    const s = await shopReady();
+    return compute.getRecentTransactions(s.id, Number.MAX_SAFE_INTEGER);
+  },
+
+  /** Home screen numbers, exact in paise. SALE = money to collect; PURCHASE / JOB_WORK = money to pay. */
+  getHomeSummary: async () => {
+    await shopReady();
+    const today = todayIST();
+    const month = today.slice(0, 7);
+    let to_collect = 0, to_pay = 0, late_collect = 0, late_pay = 0, credit = 0;
+    let today_sales = 0, month_sales = 0, month_purchases = 0;
+    for (const b of cache.rawBills()) {
+      const due: number = b.amount_due;
+      const isSale = b.kind === 'SALE';
+      const late = !!b.remind_on && b.remind_on < today && due > 0;
+      if (due > 0) {
+        if (isSale) { to_collect += due; if (late) late_collect += due; }
+        else { to_pay += due; if (late) late_pay += due; }
+      } else if (due < 0) credit += -due;
+      const net = b.grand_total - b.returned_total;
+      if (isSale && b.bill_date === today) today_sales += net;
+      if (b.bill_date.startsWith(month)) {
+        if (isSale) month_sales += net; else if (b.kind === 'PURCHASE') month_purchases += net;
+      }
+    }
+    return { to_collect, to_pay, late_collect, late_pay, credit, today_sales, month_sales, month_purchases,
+             bill_count: cache.rawBills().length };
+  },
+
+  /** Bills whose reminder date (minus lead days) has arrived and still have money due. */
+  getRemindersDue: async () => {
+    const s = await shopReady();
+    const { dueReminders } = await import('./useLiveData');
+    return dueReminders(compute.getRecentTransactions(s.id, 100000), id => cache.rawBill(id)?.remind_lead_days ?? 0);
   },
 
   /** Re-render hook: fires on any live data change for the active shop. */

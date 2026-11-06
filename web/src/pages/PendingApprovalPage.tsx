@@ -65,7 +65,7 @@ export const PendingApprovalPage: React.FC = () => {
           <p className="text-sm text-slate-600 mb-2">
             Congratulations! <strong>{shop.name}</strong> has been officially verified by the administration team.
           </p>
-          <div className="bg-slate-50 rounded-xl p-3 my-4 text-xs text-slate-500 border border-slate-200">
+          <div className="bg-slate-50 rounded-xl p-3 my-4 text-sm text-slate-500 border border-slate-200">
             <span>Verified by: <strong>{shop.verified_by || 'Admin'}</strong></span>
             <span className="block mt-0.5">Timestamp: {shop.verified_at ? new Date(shop.verified_at).toLocaleString() : 'Just now'}</span>
           </div>
@@ -180,7 +180,7 @@ export const PendingApprovalPage: React.FC = () => {
                 <h1 className="text-xl font-bold text-slate-900">
                   {isRejected ? 'Application Requires Revision' : 'Waiting for Admin Approval'}
                 </h1>
-                <p className="text-xs text-slate-500">Application Reference ID: {shop?.id || '—'}</p>
+                <p className="text-sm text-slate-500">Application Reference ID: {shop?.id || '—'}</p>
               </div>
             </div>
 
@@ -209,7 +209,7 @@ export const PendingApprovalPage: React.FC = () => {
 
               {!showEditForm ? (
                 <div className="mt-4 p-4 rounded-2xl bg-rose-50/50 border border-rose-100 flex items-center justify-between">
-                  <p className="text-xs text-rose-900">
+                  <p className="text-sm text-rose-900">
                     You can update your business details or re-upload your verification document and resubmit for approval.
                   </p>
                   <Button
@@ -276,11 +276,11 @@ export const PendingApprovalPage: React.FC = () => {
 
                   {/* Document re-upload */}
                   <div className="pt-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-sm font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                       Updated Verification Document (JPEG/JPG)
                     </label>
                     {editDocError && (
-                      <p className="text-xs text-rose-600 mb-1">{editDocError}</p>
+                      <p className="text-sm text-rose-600 mb-1">{editDocError}</p>
                     )}
                     <div className="flex items-center gap-3">
                       {editDocUrl && (
@@ -292,7 +292,7 @@ export const PendingApprovalPage: React.FC = () => {
                         type="file"
                         accept=".jpg,.jpeg,image/jpeg"
                         onChange={handleDocFileChange}
-                        className="text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-900 hover:file:bg-amber-200 cursor-pointer"
+                        className="text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-100 file:text-amber-900 hover:file:bg-amber-200 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -313,13 +313,13 @@ export const PendingApprovalPage: React.FC = () => {
           {/* Pending Info details */}
           {!isRejected && (
             <div className="mt-6 space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-xs text-amber-900 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-sm text-amber-900 leading-relaxed">
                 <p className="font-semibold mb-1">Approval Protocol in Progress</p>
                 Your registration and uploaded documents have been received and queued for review. In accordance with system security rules, access to the dashboard and ledger remains restricted until an administrator verifies your application.
               </div>
 
               <div className="rounded-2xl border border-slate-200 p-5 space-y-3 bg-white">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">
                   Submitted Business Details
                 </h3>
 
@@ -327,7 +327,7 @@ export const PendingApprovalPage: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <Store className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block">Shop Name</span>
+                      <span className="text-sm text-slate-500 block">Shop Name</span>
                       <strong className="text-slate-900">{shop?.name}</strong>
                     </div>
                   </div>
@@ -335,7 +335,7 @@ export const PendingApprovalPage: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <User className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block">Proprietor</span>
+                      <span className="text-sm text-slate-500 block">Proprietor</span>
                       <strong className="text-slate-900">{shop?.owner_name}</strong>
                     </div>
                   </div>
@@ -343,7 +343,7 @@ export const PendingApprovalPage: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <FileText className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block">GSTIN</span>
+                      <span className="text-sm text-slate-500 block">GSTIN</span>
                       <span className="font-mono font-bold text-slate-900">{shop?.gstin}</span>
                     </div>
                   </div>
@@ -351,7 +351,7 @@ export const PendingApprovalPage: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <Phone className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block">Mobile</span>
+                      <span className="text-sm text-slate-500 block">Mobile</span>
                       <span className="text-slate-900">{shop?.phone}</span>
                     </div>
                   </div>
@@ -359,7 +359,7 @@ export const PendingApprovalPage: React.FC = () => {
                   <div className="flex items-start gap-2 sm:col-span-2">
                     <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block">Shop Address</span>
+                      <span className="text-sm text-slate-500 block">Shop Address</span>
                       <span className="text-slate-700">{shop?.address} (State: {shop?.state_code})</span>
                     </div>
                   </div>
@@ -367,7 +367,7 @@ export const PendingApprovalPage: React.FC = () => {
 
                 {/* Uploaded Document Inspection */}
                 <div className="pt-3 border-t border-slate-100">
-                  <span className="text-xs text-slate-500 block mb-2 font-semibold">
+                  <span className="text-sm text-slate-500 block mb-2 font-semibold">
                     Submitted Document (JPEG/JPG)
                   </span>
                   {shop?.document_url ? (
@@ -381,10 +381,10 @@ export const PendingApprovalPage: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-slate-900 block">
+                          <span className="text-sm font-bold text-slate-900 block">
                             {shop.document_name || 'Shop_Document.jpg'}
                           </span>
-                          <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                          <span className="text-sm text-emerald-700 font-semibold flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> JPEG Upload Verified
                           </span>
                         </div>
@@ -393,20 +393,20 @@ export const PendingApprovalPage: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setShowDocModal(true)}
-                        className="text-xs gap-1"
+                        className="text-sm gap-1"
                       >
                         <ExternalLink className="w-3.5 h-3.5" /> View
                       </Button>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 italic">No document on file</p>
+                    <p className="text-sm text-slate-400 italic">No document on file</p>
                   )}
                 </div>
               </div>
             </div>
           )}
 
-          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
             <span>Logged in as <strong>{shop?.email}</strong></span>
             <button
               onClick={logout}

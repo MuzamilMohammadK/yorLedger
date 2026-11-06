@@ -1,5 +1,6 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
+import { AppShell } from './layout/AppShell';
 import { useAuth } from '../context/AuthContext';
 
 export const ProtectedRoute: React.FC = () => {
@@ -30,6 +31,6 @@ export const ProtectedRoute: React.FC = () => {
     return <Navigate to="/pending-approval" replace />;
   }
 
-  return <Outlet />;
+  return <AppShell />;
 };
 

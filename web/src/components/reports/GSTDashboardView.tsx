@@ -63,7 +63,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
       {/* Statutory Disclaimer Banner */}
       <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3 text-amber-900 shadow-xs">
         <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div className="text-xs leading-relaxed">
+        <div className="text-sm leading-relaxed">
           <strong className="font-semibold block text-amber-950 mb-0.5">Statutory GST Disclaimer:</strong>
           {disclaimer ||
             'GST analytics and tax calculations shown in YorLedger are accounting summaries and must not be presented as proof that a GST return has been filed. All figures must be reviewed and reconciled with your physical invoices by your chartered accountant or GST tax consultant prior to filing GSTR-1, GSTR-3B, or CMP-08.'}
@@ -74,7 +74,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Taxable Sales</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-slate-400">Total Taxable Sales</span>
             <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -82,12 +82,12 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
           <span className="font-serif-display text-2xl font-bold text-slate-900 block mt-2">
             {formatINR(summary.total_taxable_sales)}
           </span>
-          <span className="text-xs text-slate-500 mt-1 block">Net outward taxable supplies</span>
+          <span className="text-sm text-slate-500 mt-1 block">Net outward taxable supplies</span>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700">Output GST Liability</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-purple-700">Output GST Liability</span>
             <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
               <Receipt className="w-4 h-4" />
             </div>
@@ -95,12 +95,12 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
           <span className="font-serif-display text-2xl font-bold text-purple-900 block mt-2">
             {formatINR(summary.output_gst)}
           </span>
-          <span className="text-xs text-purple-700/80 mt-1 block font-medium">GSTR-1 outward tax liability</span>
+          <span className="text-sm text-purple-700/80 mt-1 block font-medium">GSTR-1 outward tax liability</span>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Eligible Input Tax Credit</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-emerald-700">Eligible Input Tax Credit</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <FileCheck className="w-4 h-4" />
             </div>
@@ -108,12 +108,12 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
           <span className="font-serif-display text-2xl font-bold text-emerald-700 block mt-2">
             {formatINR(summary.eligible_itc)}
           </span>
-          <span className="text-xs text-emerald-600/80 mt-1 block font-medium">From registered GSTIN purchases</span>
+          <span className="text-sm text-emerald-600/80 mt-1 block font-medium">From registered GSTIN purchases</span>
         </div>
 
         <div className="bg-gradient-to-br from-slate-900 to-purple-950 text-white p-5 rounded-3xl shadow-md shadow-slate-950/20 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-200">Net GST Payable</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-purple-200">Net GST Payable</span>
             <div className="w-8 h-8 rounded-xl bg-white/10 text-amber-300 flex items-center justify-center">
               <Scale className="w-4 h-4" />
             </div>
@@ -121,7 +121,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
           <span className="font-serif-display text-2xl font-bold text-white block mt-2">
             {formatINR(summary.net_gst_payable)}
           </span>
-          <span className="text-xs text-purple-200/80 mt-1 block">
+          <span className="text-sm text-purple-200/80 mt-1 block">
             {summary.output_gst > summary.eligible_itc ? 'Output Tax − Claimable ITC' : 'Credit Balance Available'}
           </span>
         </div>
@@ -132,13 +132,13 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="font-serif-display text-sm font-bold text-slate-900">GST Component Reconciliation Matrix</h3>
-            <p className="text-[11px] text-slate-500">Output tax collected vs input credit claimed by statutory component.</p>
+            <p className="text-sm text-slate-500">Output tax collected vs input credit claimed by statutory component.</p>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-sm">
               <tr>
                 <th className="py-3 px-6">Tax Category</th>
                 <th className="py-3 px-6 text-right">CGST (Central Tax)</th>
@@ -188,8 +188,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 1: Monthly Sales vs Purchases Bar Chart */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-xs font-bold text-slate-900">Monthly Sales vs Purchases (₹)</h4>
-            <span className="text-[10px] text-slate-400">Turnover Velocity</span>
+            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Sales vs Purchases (₹)</h4>
+            <span className="text-sm text-slate-400">Turnover Velocity</span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -212,8 +212,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 2: Monthly Output GST Trend */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-xs font-bold text-slate-900">Monthly Output GST Liability Trend (₹)</h4>
-            <span className="text-[10px] text-purple-600 font-medium">GSTR-1 Trend</span>
+            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Output GST Liability Trend (₹)</h4>
+            <span className="text-sm text-purple-600 font-medium">GSTR-1 Trend</span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -240,8 +240,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 3: Monthly Input Tax Credit Trend */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-xs font-bold text-slate-900">Monthly Input Tax Credit (ITC) Trend (₹)</h4>
-            <span className="text-[10px] text-emerald-600 font-medium">GSTR-2B Inflow</span>
+            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Input Tax Credit (ITC) Trend (₹)</h4>
+            <span className="text-sm text-emerald-600 font-medium">GSTR-2B Inflow</span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -268,8 +268,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 4: CGST vs SGST vs IGST Component Comparison */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-xs font-bold text-slate-900">CGST / SGST / IGST Tax Heads Comparison (₹)</h4>
-            <span className="text-[10px] text-slate-400">Jurisdiction Balance</span>
+            <h4 className="font-serif-display text-sm font-bold text-slate-900">CGST / SGST / IGST Tax Heads Comparison (₹)</h4>
+            <span className="text-sm text-slate-400">Jurisdiction Balance</span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -293,10 +293,10 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-serif-display text-xs font-bold text-slate-900">Monthly Net GST Cash Challan Payable (₹)</h4>
-              <p className="text-[11px] text-slate-400">Net tax after offsetting eligible ITC from output sales tax</p>
+              <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Net GST Cash Challan Payable (₹)</h4>
+              <p className="text-sm text-slate-400">Net tax after offsetting eligible ITC from output sales tax</p>
             </div>
-            <span className="text-xs font-mono font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+            <span className="text-sm font-mono font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
               GSTR-3B Net Cash
             </span>
           </div>

@@ -170,7 +170,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
         remind_on: remindOn || null,
         remind_lead_days: remindOn ? leadDays : null,
         notes: notes.trim() || null,
-        source: draft ? 'SCAN' : 'MANUAL'
+        source: draft?.items?.length ? 'SCAN' : 'MANUAL'
       });
       setSaved(res.transaction);
       onSuccess(res.transaction);

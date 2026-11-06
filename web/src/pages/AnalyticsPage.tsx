@@ -106,17 +106,17 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-600">
+              <span className="text-sm font-bold uppercase tracking-wider text-purple-600">
                 Official Registers & Tax Filing
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">
+              <span className="px-2 py-0.5 rounded-full text-sm font-bold bg-purple-50 text-purple-700">
                 Reports & GST Analytics
               </span>
             </div>
             <h1 className="font-serif-display text-2xl font-bold text-slate-900 mt-1">
               Business Reports & GST Analytics
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 mt-0.5">
               Input tax credit reconciliation, sales output liability, artisan job-work accounts and statutory compliance.
             </p>
           </div>
@@ -124,7 +124,7 @@ export const AnalyticsPage: React.FC = () => {
           {activeTab !== 'OVERVIEW' && (
             <button
               onClick={() => setActiveTab('OVERVIEW')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition-colors self-start sm:self-auto"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition-colors self-start sm:self-auto"
             >
               <ChevronLeft className="w-4 h-4 text-slate-500" />
               <span>Back to Report Cards</span>
@@ -136,7 +136,7 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none print:hidden">
           <button
             onClick={() => setActiveTab('OVERVIEW')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
               activeTab === 'OVERVIEW'
                 ? 'bg-slate-900 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -146,7 +146,7 @@ export const AnalyticsPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('PURCHASE')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
               activeTab === 'PURCHASE'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -157,7 +157,7 @@ export const AnalyticsPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('SALES')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
               activeTab === 'SALES'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -168,7 +168,7 @@ export const AnalyticsPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('JOB_WORK')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
               activeTab === 'JOB_WORK'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -179,7 +179,7 @@ export const AnalyticsPage: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('GST')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
               activeTab === 'GST'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -214,23 +214,23 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <ShoppingBag className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
                       Input Tax Credit
                     </span>
                   </div>
                   <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
                     1. Purchase Ledger
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
                     Supplier-wise bill records, GSTIN verification, returns reconciliation, and calculation of statutory eligible Input Tax Credit (ITC).
                   </p>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-sm font-semibold text-slate-400">
                     {purchaseReport?.items.length || 0} Bills Recorded
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
                     Open Register <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -246,23 +246,23 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <TrendingUp className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
                       Output Liability
                     </span>
                   </div>
                   <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
                     2. Sales Ledger
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
                     Customer billings, separation of retail intra-state sales from out-of-state inter-state (IGST) shipments, collections, and dues.
                   </p>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-sm font-semibold text-slate-400">
                     {salesReport?.items.length || 0} Invoices Recorded
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
                     Open Register <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -278,23 +278,23 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <Scissors className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
                       Production & Labor
                     </span>
                   </div>
                   <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
                     3. Artisan and Job Work
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
                     Weaver, dyer, and embroidery job work tracking, material quantities, labor disbursements, and outstanding wages dues.
                   </p>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-sm font-semibold text-slate-400">
                     {jobWorkReport?.artisan_summaries.length || 0} Artisans
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
                     Open Register <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -310,23 +310,23 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <BarChart3 className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                       GSTR-3B Analytics
                     </span>
                   </div>
                   <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
                     4. GST Dashboard
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
                     Net cash challan payable, CGST/SGST/IGST breakdown matrix, monthly turnover trends, and interactive analytical charts.
                   </p>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-sm font-semibold text-slate-400">
                     Analytical Tax Modeling
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
+                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
                     Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>

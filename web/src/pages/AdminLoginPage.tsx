@@ -45,7 +45,7 @@ export const AdminLoginPage: React.FC = () => {
           <ShieldCheck className="w-8 h-8" />
         </div>
         <h2 className="font-serif-display text-3xl font-extrabold tracking-tight">
-          YorBalance Control Center
+          YorLedger Admin
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           Administrator Verification & Approvals Portal
@@ -54,7 +54,7 @@ export const AdminLoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-slate-800/90 py-8 px-6 shadow-2xl rounded-3xl border border-slate-700 sm:px-10">
-          <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/50 text-xs text-purple-200 mb-6">
+          <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/50 text-sm text-purple-200 mb-6">
             <strong>Restricted Access:</strong> Administrator credentials cannot be created via public sign-up. They are provisioned directly by the system database administrator.
           </div>
 
@@ -62,7 +62,7 @@ export const AdminLoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label className="block text-sm font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                 Admin Email
               </label>
               <input
@@ -76,7 +76,7 @@ export const AdminLoginPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              <label className="block text-sm font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                 Admin Key / Password
               </label>
               <div className="relative">
@@ -112,7 +112,7 @@ export const AdminLoginPage: React.FC = () => {
           <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
             <Link
               to="/login"
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white"
+              className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Return to Merchant Portal
             </Link>

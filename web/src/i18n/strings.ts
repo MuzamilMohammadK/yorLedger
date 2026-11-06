@@ -3,6 +3,8 @@
 // and MUST be reviewed by a native speaker before release (see README).
 // Missing keys fall back to English automatically.
 
+import { screensEn, screensTe, screensTa, screensKn, screensHi } from './screens';
+
 export const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'te', label: 'తెలుగు' },
@@ -106,7 +108,7 @@ const en = {
   error_offline: 'No internet. Please connect and try again.'
 };
 
-export type StringKey = keyof typeof en;
+export type StringKey = keyof typeof en | keyof typeof screensEn;
 type Dict = Partial<Record<StringKey, string>>;
 
 const te: Dict = {
@@ -213,5 +215,11 @@ const hi: Dict = {
   error_generic: 'कुछ गलत हो गया। फिर से कोशिश करें।', error_offline: 'इंटरनेट नहीं है। जोड़कर फिर कोशिश करें।'
 };
 
-export const DICTS: Record<Lang, Dict> = { en, te, ta, kn, hi };
-export const EN = en;
+export const DICTS: Record<Lang, Dict> = {
+  en: { ...en, ...screensEn },
+  te: { ...te, ...screensTe },
+  ta: { ...ta, ...screensTa },
+  kn: { ...kn, ...screensKn },
+  hi: { ...hi, ...screensHi }
+};
+export const EN: Record<StringKey, string> = { ...en, ...screensEn };

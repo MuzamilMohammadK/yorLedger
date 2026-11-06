@@ -26,7 +26,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={selectId} className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+        <label htmlFor={selectId} className="block text-sm font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
           {label}
         </label>
       )}
@@ -54,10 +54,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({
         </div>
       </div>
       {error && (
-        <p className="mt-1.5 text-xs text-rose-600 font-medium">{error}</p>
+        <p className="mt-1.5 text-sm text-rose-600 font-medium">{error}</p>
       )}
       {!error && helperText && (
-        <p className="mt-1 text-xs text-slate-500">{helperText}</p>
+        <p className="mt-1 text-sm text-slate-500">{helperText}</p>
       )}
     </div>
   );

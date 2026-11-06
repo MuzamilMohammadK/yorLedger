@@ -26,7 +26,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
           <TrendingUp className="w-6 h-6" />
         </div>
         <h3 className="font-serif-display text-base font-bold text-slate-800">No Sales Bills Recorded</h3>
-        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+        <p className="text-sm text-slate-500 max-w-sm mx-auto">
           There are no sales transactions matching the selected filters or time period.
         </p>
       </div>
@@ -49,48 +49,48 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
       {/* Summary KPI Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Sales</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Sales</span>
           <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
             {formatINR(totals.total_sales_value)}
           </span>
-          <span className="text-[10px] text-slate-500">{items.length} Invoices</span>
+          <span className="text-sm text-slate-500">{items.length} Invoices</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Taxable Base</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Taxable Base</span>
           <span className="font-serif-display text-base font-bold text-slate-800 block mt-0.5">
             {formatINR(totals.total_taxable_sales)}
           </span>
-          <span className="text-[10px] text-slate-500">Net Sales Base</span>
+          <span className="text-sm text-slate-500">Net Sales Base</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">Output Tax (GST)</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-purple-700 block">Output Tax (GST)</span>
           <span className="font-mono text-sm font-semibold text-purple-900 block mt-0.5">
             {formatINR(totals.total_output_gst)}
           </span>
-          <span className="text-[10px] text-purple-600 font-medium">GSTR-1 Liability</span>
+          <span className="text-sm text-purple-600 font-medium">GSTR-1 Liability</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">Amount Collected</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-emerald-600 block">Amount Collected</span>
           <span className="font-mono text-sm font-semibold text-emerald-700 block mt-0.5">
             {formatINR(totals.total_paid)}
           </span>
-          <span className="text-[10px] text-slate-400">Cash / Bank Inflows</span>
+          <span className="text-sm text-slate-400">Cash / Bank Inflows</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">Remaining Due</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-rose-500 block">Remaining Due</span>
           <span className="font-serif-display text-base font-bold text-rose-600 block mt-0.5">
             {formatINR(totals.total_outstanding_due)}
           </span>
-          <span className="text-[10px] text-slate-400">Customer Balances</span>
+          <span className="text-sm text-slate-400">Customer Balances</span>
         </div>
 
         <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">State Distribution</span>
-          <div className="text-[11px] text-slate-700 mt-1 space-y-0.5">
+          <span className="text-sm font-bold uppercase tracking-wider text-slate-500 block">State Distribution</span>
+          <div className="text-sm text-slate-700 mt-1 space-y-0.5">
             <div className="flex justify-between">
               <span>Local:</span>
               <span className="font-bold">{formatINR(totals.intra_state_sales)}</span>
@@ -107,7 +107,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab('ALL')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
             activeTab === 'ALL'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -117,7 +117,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
         </button>
         <button
           onClick={() => setActiveTab('INTRA_STATE')}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
             activeTab === 'INTRA_STATE'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -128,7 +128,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
         </button>
         <button
           onClick={() => setActiveTab('INTER_STATE')}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
             activeTab === 'INTER_STATE'
               ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -142,8 +142,8 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
       {/* Desktop Table */}
       <div className="hidden md:block bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-sm">
               <tr>
                 <th className="py-3 px-4">Date / Bill #</th>
                 <th className="py-3 px-4">Customer & GSTIN</th>
@@ -165,7 +165,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
                     <span className="font-semibold text-slate-900 block font-mono">
                       {item.invoice_number || 'N/A'}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-sm text-slate-400">
                       {new Date(item.bill_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </td>
@@ -174,22 +174,22 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
                       {item.customer_name}
                     </span>
                     {item.customer_gstin ? (
-                      <span className="font-mono text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 inline-block mt-0.5">
+                      <span className="font-mono text-sm text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 inline-block mt-0.5">
                         {item.customer_gstin}
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                      <span className="text-sm text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
                         Consumer / B2C
                       </span>
                     )}
                   </td>
                   <td className="py-3 px-4">
                     {!item.is_inter_state ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         <MapPin className="w-2.5 h-2.5" /> Intra-State
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
                         <Globe className="w-2.5 h-2.5" /> Inter-State (IGST)
                       </span>
                     )}
@@ -217,7 +217,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      className={`inline-block px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
                         item.payment_status === 'SETTLED'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : item.payment_status === 'PARTIAL'
@@ -256,13 +256,13 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
           <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="font-mono font-bold text-xs text-slate-900 block">{item.invoice_number || 'N/A'}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-mono font-bold text-sm text-slate-900 block">{item.invoice_number || 'N/A'}</span>
+                <span className="text-sm text-slate-400">
                   {new Date(item.bill_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                className={`px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
                   item.payment_status === 'SETTLED'
                     ? 'bg-emerald-50 text-emerald-700'
                     : item.payment_status === 'PARTIAL'
@@ -278,33 +278,33 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
 
             <div className="pt-1 border-t border-slate-100 flex items-center justify-between">
               <div>
-                <span className="font-medium text-xs text-slate-900 block">{item.customer_name}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-medium text-sm text-slate-900 block">{item.customer_name}</span>
+                <span className="text-sm text-slate-400">
                   {item.customer_gstin ? `GSTIN: ${item.customer_gstin}` : 'Consumer / B2C'}
                 </span>
               </div>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+              <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
                 !item.is_inter_state ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'
               }`}>
                 {!item.is_inter_state ? 'Intra-State' : 'Inter-State'}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t border-slate-100">
               <div>
-                <span className="text-[10px] text-slate-400 block">Total Bill</span>
+                <span className="text-sm text-slate-400 block">Total Bill</span>
                 <span className="font-mono font-bold text-slate-900">{formatINR(item.grand_total)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Output Tax</span>
+                <span className="text-sm text-slate-400 block">Output Tax</span>
                 <span className="font-mono font-medium text-purple-700">{formatINR(item.total_gst)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Paid</span>
+                <span className="text-sm text-slate-400 block">Paid</span>
                 <span className="font-mono font-medium text-emerald-700">{formatINR(item.amount_paid)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Remaining Due</span>
+                <span className="text-sm text-slate-400 block">Remaining Due</span>
                 <span className="font-mono font-bold text-rose-600">{formatINR(item.remaining_due)}</span>
               </div>
             </div>

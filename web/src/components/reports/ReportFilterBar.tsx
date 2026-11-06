@@ -45,7 +45,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
         {/* Quick Filter Selectors */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Financial Year */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm">
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
             <select
               value={filters.financialYear || ''}
@@ -60,7 +60,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
           </div>
 
           {/* Quarter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm">
             <span className="text-slate-400 font-medium">Quarter:</span>
             <select
               value={filters.quarter || ''}
@@ -76,31 +76,31 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
           </div>
 
           {/* Month */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm">
             <span className="text-slate-400 font-medium">Month:</span>
             <input
               type="month"
               value={filters.month || ''}
               onChange={e => onChange({ ...filters, month: e.target.value || undefined, quarter: undefined })}
-              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-xs"
+              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-sm"
             />
           </div>
 
           {/* Custom Date Range */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-sm">
             <span className="text-slate-400 font-medium">From:</span>
             <input
               type="date"
               value={filters.from || ''}
               onChange={e => onChange({ ...filters, from: e.target.value || undefined })}
-              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-xs"
+              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-sm"
             />
             <span className="text-slate-400 font-medium ml-1">To:</span>
             <input
               type="date"
               value={filters.to || ''}
               onChange={e => onChange({ ...filters, to: e.target.value || undefined })}
-              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-xs"
+              className="bg-transparent font-semibold text-slate-700 outline-none cursor-pointer text-sm"
             />
           </div>
 
@@ -120,7 +120,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
             <button
               onClick={onExportCsv}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-xs transition-colors disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5 text-slate-500" />
               <span>Export CSV</span>
@@ -131,7 +131,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
             <button
               onClick={onPrint}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold shadow-xs transition-colors disabled:opacity-50"
             >
               <Printer className="w-3.5 h-3.5 text-slate-500" />
               <span>Print / PDF</span>
@@ -149,7 +149,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
             placeholder={partySearchPlaceholder}
             value={filters.partySearch || ''}
             onChange={e => onChange({ ...filters, partySearch: e.target.value })}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
           />
         </div>
       )}

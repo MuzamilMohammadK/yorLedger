@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { useI18n, LANGUAGES, Lang } from '../i18n';
 import { INDIAN_STATES } from '@yorbalance/shared';
 import {
   ShopSettingsData,
@@ -39,6 +40,7 @@ type SettingsTab =
 
 export const SettingsPage: React.FC = () => {
   const { shop, user, logout, sendResetEmail, refreshSession } = useAuth();
+  const { lang, setLang } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -289,30 +291,30 @@ export const SettingsPage: React.FC = () => {
         {/* Page Header */}
         <div className="pb-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-600">
+            <span className="text-sm font-bold uppercase tracking-wider text-purple-600">
               System Configuration
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">
+            <span className="px-2 py-0.5 rounded-full text-sm font-bold bg-purple-50 text-purple-700">
               YorLedger v1.0.0
             </span>
           </div>
           <h1 className="font-serif-display text-2xl font-bold text-slate-900 mt-1">
             Shop Settings & Configuration
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5">
             Manage your saree business profile, tax parameters, invoice formats, notifications, and automated backups.
           </p>
         </div>
 
         {/* Global Feedback Banners */}
         {successMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold shadow-xs animate-in fade-in duration-200">
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-sm font-semibold shadow-xs animate-in fade-in duration-200">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMsg}</span>
           </div>
         )}
         {errorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-xs font-semibold shadow-xs animate-in fade-in duration-200">
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-sm font-semibold shadow-xs animate-in fade-in duration-200">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -337,8 +339,8 @@ export const SettingsPage: React.FC = () => {
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs block truncate">{sec.name}</span>
-                    <span className={`text-[10px] block truncate ${isActive ? 'text-purple-200' : 'text-slate-400'}`}>
+                    <span className="text-sm block truncate">{sec.name}</span>
+                    <span className={`text-sm block truncate ${isActive ? 'text-purple-200' : 'text-slate-400'}`}>
                       {sec.desc}
                     </span>
                   </div>
@@ -355,22 +357,22 @@ export const SettingsPage: React.FC = () => {
                 <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-serif-display text-base font-bold text-slate-900">1. Shop Profile & Identity</h3>
-                    <p className="text-xs text-slate-500">Business registration details, owner contact and official address.</p>
+                    <p className="text-sm text-slate-500">Business registration details, owner contact and official address.</p>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-semibold">
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>Verified: {shop?.status || 'APPROVED'}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Shop / Business Name *</label>
                     <input
                       type="text"
                       value={profileForm.name}
                       onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                       required
                     />
                   </div>
@@ -381,7 +383,7 @@ export const SettingsPage: React.FC = () => {
                       type="text"
                       value={profileForm.owner_name}
                       onChange={e => setProfileForm({ ...profileForm, owner_name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                       required
                     />
                   </div>
@@ -392,7 +394,7 @@ export const SettingsPage: React.FC = () => {
                       type="tel"
                       value={profileForm.phone}
                       onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                       required
                     />
                   </div>
@@ -403,7 +405,7 @@ export const SettingsPage: React.FC = () => {
                       type="email"
                       value={profileForm.email}
                       onChange={e => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                     />
                   </div>
 
@@ -413,7 +415,7 @@ export const SettingsPage: React.FC = () => {
                       rows={2}
                       value={profileForm.address}
                       onChange={e => setProfileForm({ ...profileForm, address: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                       required
                     />
                   </div>
@@ -430,7 +432,7 @@ export const SettingsPage: React.FC = () => {
                           state: sel?.name || profileForm.state
                         });
                       }}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer"
                     >
                       {INDIAN_STATES.map(s => (
                         <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
@@ -445,7 +447,7 @@ export const SettingsPage: React.FC = () => {
                       maxLength={6}
                       value={profileForm.pin_code}
                       onChange={e => setProfileForm({ ...profileForm, pin_code: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
                       placeholder="560002"
                     />
                   </div>
@@ -456,10 +458,10 @@ export const SettingsPage: React.FC = () => {
                       type="url"
                       value={profileForm.logo_url}
                       onChange={e => setProfileForm({ ...profileForm, logo_url: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                       placeholder="https://example.com/logo.png"
                     />
-                    <span className="text-[10px] text-slate-400 mt-1 block">
+                    <span className="text-sm text-slate-400 mt-1 block">
                       Displayed on PDF invoices, transaction receipts, and customer WhatsApp summaries.
                     </span>
                   </div>
@@ -469,7 +471,7 @@ export const SettingsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Save Profile Changes'}</span>
@@ -483,11 +485,11 @@ export const SettingsPage: React.FC = () => {
               <form onSubmit={handleSaveGST} className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">2. GST & Tax Configurations</h3>
-                  <p className="text-xs text-slate-500">Statutory tax identifier, registered state, and default billing GST rates.</p>
+                  <p className="text-sm text-slate-500">Statutory tax identifier, registered state, and default billing GST rates.</p>
                 </div>
 
                 {/* Statutory Immutability Guarantee Notice */}
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-xs">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-sm">
                   <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <div className="leading-relaxed">
                     <strong className="block text-amber-950 font-semibold mb-0.5">
@@ -498,13 +500,13 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">GST Registration Type</label>
                     <select
                       value={gstForm.gst_status}
                       onChange={e => setGstForm({ ...gstForm, gst_status: e.target.value as any })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
                     >
                       <option value="REGISTERED">Regular GST Registered (Eligible for ITC)</option>
                       <option value="COMPOSITION">Composition Scheme Dealer (CMP-08)</option>
@@ -519,7 +521,7 @@ export const SettingsPage: React.FC = () => {
                       maxLength={15}
                       value={gstForm.gstin}
                       onChange={e => setGstForm({ ...gstForm, gstin: e.target.value.toUpperCase() })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-mono uppercase"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono uppercase"
                       placeholder="29ABCDE1234F1Z5"
                       disabled={gstForm.gst_status === 'UNREGISTERED'}
                     />
@@ -530,14 +532,14 @@ export const SettingsPage: React.FC = () => {
                     <select
                       value={gstForm.default_gst_bp}
                       onChange={e => setGstForm({ ...gstForm, default_gst_bp: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-semibold"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-semibold"
                     >
                       <option value={500}>5% GST (Standard Silk Sarees & Handlooms)</option>
                       <option value={1200}>12% GST (High-Value Silk & Embroidery Job-Work)</option>
                       <option value={1800}>18% GST (Synthetic Silk & Tailoring Accessories)</option>
                       <option value={0}>0% GST (Exempt Khadi & Raw Cocoons)</option>
                     </select>
-                    <span className="text-[10px] text-slate-400 mt-1 block">
+                    <span className="text-sm text-slate-400 mt-1 block">
                       Stored in basis points: {gstForm.default_gst_bp} bp = {(gstForm.default_gst_bp / 100).toFixed(1)}%
                     </span>
                   </div>
@@ -548,9 +550,9 @@ export const SettingsPage: React.FC = () => {
                       type="text"
                       value={gstForm.state_code}
                       readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-xs font-mono cursor-not-allowed"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm font-mono cursor-not-allowed"
                     />
-                    <span className="text-[10px] text-slate-400 mt-1 block">
+                    <span className="text-sm text-slate-400 mt-1 block">
                       Determines Intra-State (CGST+SGST) vs Inter-State (IGST) split.
                     </span>
                   </div>
@@ -560,7 +562,7 @@ export const SettingsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Update Tax Preferences'}</span>
@@ -574,17 +576,17 @@ export const SettingsPage: React.FC = () => {
               <form onSubmit={handleSaveInvoice} className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">3. Invoice Branding & Formatting</h3>
-                  <p className="text-xs text-slate-500">Configure sequential billing numbers, tax breakdown display, and terms.</p>
+                  <p className="text-sm text-slate-500">Configure sequential billing numbers, tax breakdown display, and terms.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Invoice Prefix</label>
                     <input
                       type="text"
                       value={invoiceSettings.invoice_prefix}
                       onChange={e => setInvoiceSettings({ ...invoiceSettings, invoice_prefix: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
                       placeholder="INV-"
                     />
                   </div>
@@ -595,7 +597,7 @@ export const SettingsPage: React.FC = () => {
                       type="number"
                       value={invoiceSettings.suggested_next_number}
                       onChange={e => setInvoiceSettings({ ...invoiceSettings, suggested_next_number: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
                     />
                   </div>
 
@@ -604,7 +606,7 @@ export const SettingsPage: React.FC = () => {
                     <select
                       value={invoiceSettings.date_format}
                       onChange={e => setInvoiceSettings({ ...invoiceSettings, date_format: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
                     >
                       <option value="DD/MM/YYYY">DD/MM/YYYY (Indian Standard)</option>
                       <option value="DD-MMM-YYYY">DD-MMM-YYYY (e.g. 05-Nov-2026)</option>
@@ -615,9 +617,9 @@ export const SettingsPage: React.FC = () => {
 
                 {/* Display Toggles */}
                 <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-slate-800 block">Bill Display Preferences</span>
+                  <span className="text-sm font-bold text-slate-800 block">Bill Display Preferences</span>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                       <input
                         type="checkbox"
                         checked={invoiceSettings.show_logo}
@@ -627,7 +629,7 @@ export const SettingsPage: React.FC = () => {
                       <span className="font-medium text-slate-800">Print Shop Logo</span>
                     </label>
 
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                       <input
                         type="checkbox"
                         checked={invoiceSettings.show_gstin}
@@ -637,7 +639,7 @@ export const SettingsPage: React.FC = () => {
                       <span className="font-medium text-slate-800">Print GSTIN Header</span>
                     </label>
 
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                       <input
                         type="checkbox"
                         checked={invoiceSettings.show_tax_breakdown}
@@ -649,14 +651,14 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-2 text-xs">
+                <div className="space-y-4 pt-2 text-sm">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Invoice Footer Greeting</label>
                     <input
                       type="text"
                       value={invoiceSettings.invoice_footer}
                       onChange={e => setInvoiceSettings({ ...invoiceSettings, invoice_footer: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
                     />
                   </div>
 
@@ -666,7 +668,7 @@ export const SettingsPage: React.FC = () => {
                       rows={3}
                       value={invoiceSettings.terms_and_conditions}
                       onChange={e => setInvoiceSettings({ ...invoiceSettings, terms_and_conditions: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs leading-relaxed"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm leading-relaxed"
                     />
                   </div>
                 </div>
@@ -675,7 +677,7 @@ export const SettingsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Save Invoice Formatting'}</span>
@@ -689,11 +691,11 @@ export const SettingsPage: React.FC = () => {
               <form onSubmit={handleSaveNotifications} className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">4. Notification & Due Reminders</h3>
-                  <p className="text-xs text-slate-500">Configure reminder lead times, in-app notifications and morning dispatch schedule.</p>
+                  <p className="text-sm text-slate-500">Configure reminder lead times, in-app notifications and morning dispatch schedule.</p>
                 </div>
 
                 {/* 08:00 AM IST Cron Notice */}
-                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3 text-purple-900 text-xs">
+                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3 text-purple-900 text-sm">
                   <Bell className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
                   <div className="leading-relaxed">
                     <strong className="block text-purple-950 font-semibold mb-0.5">
@@ -705,10 +707,10 @@ export const SettingsPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                     <div>
                       <span className="font-semibold text-slate-900 block">Enable Automated Due Date Reminders</span>
-                      <span className="text-[11px] text-slate-500">Trigger alerts before customer credit bills mature</span>
+                      <span className="text-sm text-slate-500">Trigger alerts before customer credit bills mature</span>
                     </div>
                     <input
                       type="checkbox"
@@ -718,10 +720,10 @@ export const SettingsPage: React.FC = () => {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                     <div>
                       <span className="font-semibold text-slate-900 block">In-App Notification Center Badge</span>
-                      <span className="text-[11px] text-slate-500">Display unread badge alerts in navigation header</span>
+                      <span className="text-sm text-slate-500">Display unread badge alerts in navigation header</span>
                     </div>
                     <input
                       type="checkbox"
@@ -731,10 +733,10 @@ export const SettingsPage: React.FC = () => {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-xs">
+                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
                     <div>
                       <span className="font-semibold text-slate-900 block">Web Push Notifications</span>
-                      <span className="text-[11px] text-slate-500">Receive desktop alerts when payment receipts are logged</span>
+                      <span className="text-sm text-slate-500">Receive desktop alerts when payment receipts are logged</span>
                     </div>
                     <input
                       type="checkbox"
@@ -745,12 +747,12 @@ export const SettingsPage: React.FC = () => {
                   </label>
                 </div>
 
-                <div className="pt-2 text-xs">
+                <div className="pt-2 text-sm">
                   <label className="block text-slate-700 font-semibold mb-1">Reminder Lead Time (Notice Prior to Due Date)</label>
                   <select
                     value={notificationSettings.reminder_lead_time_days}
                     onChange={e => setNotificationSettings({ ...notificationSettings, reminder_lead_time_days: Number(e.target.value) as any })}
-                    className="w-full sm:w-64 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-semibold"
+                    className="w-full sm:w-64 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-semibold"
                   >
                     <option value={0}>On the Due Date (0 days before)</option>
                     <option value={1}>1 Day Before Maturity</option>
@@ -763,7 +765,7 @@ export const SettingsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Save Notification Preferences'}</span>
@@ -777,20 +779,20 @@ export const SettingsPage: React.FC = () => {
               <div className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">5. Account & Security</h3>
-                  <p className="text-xs text-slate-500">Firebase Authentication credentials, password recovery and session termination.</p>
+                  <p className="text-sm text-slate-500">Firebase Authentication credentials, password recovery and session termination.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Registered Owner Email</span>
+                    <span className="text-slate-400 font-semibold block text-sm uppercase">Registered Owner Email</span>
                     <strong className="text-slate-900 font-medium text-sm block mt-0.5">{user?.email || 'N/A'}</strong>
-                    <span className="text-slate-500 text-[11px]">Primary authentication ID</span>
+                    <span className="text-slate-500 text-sm">Primary authentication ID</span>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">Assigned User Role</span>
+                    <span className="text-slate-400 font-semibold block text-sm uppercase">Assigned User Role</span>
                     <strong className="text-purple-700 font-bold text-sm block mt-0.5">{user?.role || 'SHOP_OWNER'}</strong>
-                    <span className="text-slate-500 text-[11px]">Full Tenant Administration Rights</span>
+                    <span className="text-slate-500 text-sm">Full Tenant Administration Rights</span>
                   </div>
                 </div>
 
@@ -798,21 +800,21 @@ export const SettingsPage: React.FC = () => {
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h4 className="font-semibold text-xs text-slate-900">Reset Account Password</h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <h4 className="font-semibold text-sm text-slate-900">Reset Account Password</h4>
+                      <p className="text-sm text-slate-500 mt-0.5">
                         A secure password reset verification link will be sent to your registered email via Firebase Auth.
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={handlePasswordReset}
-                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 font-semibold text-xs transition-colors shrink-0 shadow-xs"
+                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 font-semibold text-sm transition-colors shrink-0 shadow-xs"
                     >
                       Send Reset Link
                     </button>
                   </div>
                   {resetEmailSent && (
-                    <div className="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 pt-1">
+                    <div className="text-sm text-emerald-700 font-medium flex items-center gap-1.5 pt-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       Check your inbox for the password reset instructions.
                     </div>
@@ -822,8 +824,8 @@ export const SettingsPage: React.FC = () => {
                 {/* Sign-Out Action */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-slate-800 block">Sign Out of Session</span>
-                    <span className="text-[11px] text-slate-400">Terminates active browser authentication tokens</span>
+                    <span className="text-sm font-semibold text-slate-800 block">Sign Out of Session</span>
+                    <span className="text-sm text-slate-400">Terminates active browser authentication tokens</span>
                   </div>
                   <button
                     type="button"
@@ -831,7 +833,7 @@ export const SettingsPage: React.FC = () => {
                       await logout();
                       window.location.href = '/login';
                     }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors border border-rose-200"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-sm transition-colors border border-rose-200"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Log Out</span>
@@ -845,17 +847,17 @@ export const SettingsPage: React.FC = () => {
               <form onSubmit={handleSavePreferences} className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">6. Display & Regional Preferences</h3>
-                  <p className="text-xs text-slate-500">Formatting standards, retail counter theme, and default starting screen.</p>
+                  <p className="text-sm text-slate-500">Formatting standards, retail counter theme, and default starting screen.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Standard Operating Currency</label>
                     <input
                       type="text"
                       value="INR (₹) – Indian Rupee (Stored in Integer Paise)"
                       readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-xs cursor-not-allowed font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm cursor-not-allowed font-medium"
                     />
                   </div>
 
@@ -865,7 +867,7 @@ export const SettingsPage: React.FC = () => {
                       type="text"
                       value="Asia/Kolkata (IST, UTC +05:30)"
                       readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-xs cursor-not-allowed font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm cursor-not-allowed font-medium"
                     />
                   </div>
 
@@ -874,11 +876,10 @@ export const SettingsPage: React.FC = () => {
                     <select
                       value={appPreferences.default_landing_page}
                       onChange={e => setAppPreferences({ ...appPreferences, default_landing_page: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
                     >
                       <option value="/dashboard">Overview Dashboard</option>
-                      <option value="/ledger">Ledger & Quick Entry</option>
-                      <option value="/dues">Dues & Collections</option>
+                                            <option value="/dues">Dues & Collections</option>
                       <option value="/analytics">Reports & GST Analytics</option>
                     </select>
                   </div>
@@ -886,15 +887,11 @@ export const SettingsPage: React.FC = () => {
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1">Interface Language</label>
                     <select
-                      value={appPreferences.language}
-                      onChange={e => setAppPreferences({ ...appPreferences, language: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-xs cursor-pointer font-medium"
+                      value={lang}
+                      onChange={e => { setLang(e.target.value as Lang); setAppPreferences({ ...appPreferences, language: e.target.value }); }}
+                      className="w-full h-12 px-3.5 rounded-xl border-2 border-slate-200 bg-white focus:outline-none focus:border-indigo-600 text-base cursor-pointer font-medium"
                     >
-                      <option value="en">English (Default)</option>
-                      <option value="kn" disabled>ಕನ್ನಡ (Kannada - Coming Soon)</option>
-                      <option value="hi" disabled>हिन्दी (Hindi - Coming Soon)</option>
-                      <option value="te" disabled>తెలుగు (Telugu - Coming Soon)</option>
-                      <option value="ta" disabled>தமிழ் (Tamil - Coming Soon)</option>
+                      {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
                     </select>
                   </div>
                 </div>
@@ -903,7 +900,7 @@ export const SettingsPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{saving ? 'Saving...' : 'Save App Preferences'}</span>
@@ -917,15 +914,15 @@ export const SettingsPage: React.FC = () => {
               <div className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">7. Data Ownership & Backup</h3>
-                  <p className="text-xs text-slate-500">Download complete CSV backups and review automated Cloud SQL disaster recovery.</p>
+                  <p className="text-sm text-slate-500">Download complete CSV backups and review automated Cloud SQL disaster recovery.</p>
                 </div>
 
                 {/* Cloud SQL Snapshot Active Badge */}
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="text-xs font-bold text-emerald-950 block">Automated Cloud SQL Backup: Active</strong>
-                    <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                    <strong className="text-sm font-bold text-emerald-950 block">Automated Cloud SQL Backup: Active</strong>
+                    <p className="text-sm text-emerald-800 mt-0.5 leading-relaxed">
                       Daily automated point-in-time recovery (PITR) snapshots are managed on Google Cloud SQL with a 30-day retention policy.
                       Multi-tenant isolation enforces strict partition security by your shop ID.
                     </p>
@@ -934,19 +931,19 @@ export const SettingsPage: React.FC = () => {
 
                 {/* One-Click CSV Downloads */}
                 <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-slate-900 block">Export Your Ledger Data (CSV Format)</span>
+                  <span className="text-sm font-bold text-slate-900 block">Export Your Ledger Data (CSV Format)</span>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
                       <div>
-                        <span className="font-semibold text-xs text-slate-900 block">Transaction Ledger</span>
-                        <span className="text-[11px] text-slate-500 mt-0.5 block">
+                        <span className="font-semibold text-sm text-slate-900 block">Transaction Ledger</span>
+                        <span className="text-sm text-slate-500 mt-0.5 block">
                           All recorded sales, purchases, job work and payment vouchers.
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleDownloadCSV('transactions')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-slate-100 transition-colors shadow-xs"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
                       >
                         <Download className="w-3.5 h-3.5 text-slate-500" />
                         <span>Download CSV</span>
@@ -955,15 +952,15 @@ export const SettingsPage: React.FC = () => {
 
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
                       <div>
-                        <span className="font-semibold text-xs text-slate-900 block">Party Directory</span>
-                        <span className="text-[11px] text-slate-500 mt-0.5 block">
+                        <span className="font-semibold text-sm text-slate-900 block">Party Directory</span>
+                        <span className="text-sm text-slate-500 mt-0.5 block">
                           Customers, suppliers, and artisan contacts with balances.
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleDownloadCSV('parties')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-slate-100 transition-colors shadow-xs"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
                       >
                         <Download className="w-3.5 h-3.5 text-slate-500" />
                         <span>Download CSV</span>
@@ -972,15 +969,15 @@ export const SettingsPage: React.FC = () => {
 
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
                       <div>
-                        <span className="font-semibold text-xs text-slate-900 block">GST Summary Register</span>
-                        <span className="text-[11px] text-slate-500 mt-0.5 block">
+                        <span className="font-semibold text-sm text-slate-900 block">GST Summary Register</span>
+                        <span className="text-sm text-slate-500 mt-0.5 block">
                           Itemized tax heads, eligible ITC and reconciliation data.
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleDownloadCSV('reports')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-semibold hover:bg-slate-100 transition-colors shadow-xs"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
                       >
                         <Download className="w-3.5 h-3.5 text-slate-500" />
                         <span>Download CSV</span>
@@ -996,7 +993,7 @@ export const SettingsPage: React.FC = () => {
               <div className="space-y-6">
                 <div className="border-b border-slate-100 pb-4">
                   <h3 className="font-serif-display text-base font-bold text-slate-900">8. About YorLedger & Compliance</h3>
-                  <p className="text-xs text-slate-500">Application build metadata, developer information, terms and support.</p>
+                  <p className="text-sm text-slate-500">Application build metadata, developer information, terms and support.</p>
                 </div>
 
                 <div className="flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-900 to-slate-900 text-white shadow-sm">
@@ -1004,24 +1001,24 @@ export const SettingsPage: React.FC = () => {
                     SB
                   </div>
                   <div>
-                    <h4 className="font-serif-display text-base font-bold">YorLedger (SB&A Silk Balance & Analysis)</h4>
-                    <p className="text-xs text-purple-200">
+                    <h4 className="font-serif-display text-base font-bold">YorLedger</h4>
+                    <p className="text-sm text-purple-200">
                       Version 1.0.0 Production Build (Build ID: 2026.11.05-REL)
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                     <span className="font-semibold text-slate-900 block">Design & Engineering</span>
-                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                    <p className="text-slate-600 text-sm leading-relaxed">
                       Custom-engineered for wholesale saree distributors, retail silk showrooms, handloom cooperatives, and artisan job-work units.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                     <span className="font-semibold text-slate-900 block">Help & Support Desk</span>
-                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                    <p className="text-slate-600 text-sm leading-relaxed">
                       Technical support: <span className="font-mono text-purple-700">support@yorbalance.in</span>
                       <br />
                       Helpline: +91 98450 12345 (10:00 AM – 7:00 PM IST)
@@ -1029,7 +1026,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-4 space-y-2 text-xs text-slate-500">
+                <div className="border-t border-slate-100 pt-4 space-y-2 text-sm text-slate-500">
                   <div className="flex flex-wrap gap-4 font-semibold text-purple-700">
                     <a href="#terms" onClick={e => { e.preventDefault(); alert('Terms of Service: YorLedger software is provided for business accounting record keeping in compliance with Indian GST regulations.'); }} className="hover:underline">
                       Terms of Service
@@ -1043,8 +1040,8 @@ export const SettingsPage: React.FC = () => {
                       Statutory GST Notice
                     </a>
                   </div>
-                  <p className="text-[11px] text-slate-400">
-                    © 2026 YorBalance. All rights reserved. Saree & Silk Balance Management System.
+                  <p className="text-sm text-slate-400">
+                    © 2026 YorLedger
                   </p>
                 </div>
               </div>

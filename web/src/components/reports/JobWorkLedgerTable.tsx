@@ -24,7 +24,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
           <Scissors className="w-6 h-6" />
         </div>
         <h3 className="font-serif-display text-base font-bold text-slate-800">No Job-Work Transactions</h3>
-        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+        <p className="text-sm text-slate-500 max-w-sm mx-auto">
           There are no artisan weaving, dyeing, zari or embroidery job-work transactions in this period.
         </p>
       </div>
@@ -38,35 +38,35 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
       {/* Summary KPI Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Job Work Value</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Job Work Value</span>
           <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
             {formatINR(totals.total_job_work_value)}
           </span>
-          <span className="text-[10px] text-slate-500">{items.length} Work Orders</span>
+          <span className="text-sm text-slate-500">{items.length} Work Orders</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">Total GST on Job Work</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-purple-700 block">Total GST on Job Work</span>
           <span className="font-mono text-sm font-semibold text-purple-900 block mt-0.5">
             {formatINR(totals.total_gst)}
           </span>
-          <span className="text-[10px] text-purple-600">Applicable ITC</span>
+          <span className="text-sm text-purple-600">Applicable ITC</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">Total Payments Disbursed</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-emerald-600 block">Total Payments Disbursed</span>
           <span className="font-mono text-sm font-semibold text-emerald-700 block mt-0.5">
             {formatINR(totals.total_payments)}
           </span>
-          <span className="text-[10px] text-slate-400">Settled to Artisans</span>
+          <span className="text-sm text-slate-400">Settled to Artisans</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">Pending Artisan Dues</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-rose-500 block">Pending Artisan Dues</span>
           <span className="font-serif-display text-base font-bold text-rose-600 block mt-0.5">
             {formatINR(totals.total_outstanding)}
           </span>
-          <span className="text-[10px] text-rose-500/80 font-medium">{artisan_summaries.length} Active Artisans</span>
+          <span className="text-sm text-rose-500/80 font-medium">{artisan_summaries.length} Active Artisans</span>
         </div>
       </div>
 
@@ -78,24 +78,24 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
             <div key={art.artisan_id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-xs text-slate-900 block">{art.artisan_name}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">ID: {art.artisan_id.slice(0, 8)}</span>
+                  <span className="font-semibold text-sm text-slate-900 block">{art.artisan_name}</span>
+                  <span className="text-sm text-slate-400 font-mono">ID: {art.artisan_id.slice(0, 8)}</span>
                 </div>
-                <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
+                <span className="text-sm font-bold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">
                   {art.transaction_count} Orders
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-200/60">
+              <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t border-slate-200/60">
                 <div>
-                  <span className="text-[10px] text-slate-400 block">Total Work</span>
+                  <span className="text-sm text-slate-400 block">Total Work</span>
                   <span className="font-mono font-semibold text-slate-800">{formatINR(art.total_job_work_value)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block">Paid</span>
+                  <span className="text-sm text-slate-400 block">Paid</span>
                   <span className="font-mono font-semibold text-emerald-700">{formatINR(art.total_payments)}</span>
                 </div>
                 <div className="col-span-2 flex justify-between items-center pt-1 border-t border-slate-100">
-                  <span className="text-[10px] text-rose-600 font-medium">Pending Due:</span>
+                  <span className="text-sm text-rose-600 font-medium">Pending Due:</span>
                   <span className="font-mono font-bold text-rose-600">{formatINR(art.outstanding_amount)}</span>
                 </div>
               </div>
@@ -109,16 +109,16 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 className="font-serif-display text-sm font-bold text-slate-900">Job-Work Transaction Register</h3>
-            <p className="text-[11px] text-slate-500">Itemized work descriptions, fabric quantities, labor charges, and dues.</p>
+            <p className="text-sm text-slate-500">Itemized work descriptions, fabric quantities, labor charges, and dues.</p>
           </div>
-          <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+          <span className="text-sm font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
             {items.length} Records
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider text-sm">
               <tr>
                 <th className="py-3 px-4">Date / Ref #</th>
                 <th className="py-3 px-4">Artisan</th>
@@ -138,13 +138,13 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
                     <span className="font-semibold text-slate-900 block font-mono">
                       {item.job_work_reference || 'N/A'}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-sm text-slate-400">
                       {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </span>
                   </td>
                   <td className="py-3 px-4">
                     <span className="font-semibold text-slate-900 block">{item.artisan_name}</span>
-                    <span className="text-[10px] text-slate-400">Artisan</span>
+                    <span className="text-sm text-slate-400">Artisan</span>
                   </td>
                   <td className="py-3 px-4 max-w-[220px]">
                     <span className="text-slate-800 line-clamp-1" title={item.work_details}>
@@ -168,7 +168,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      className={`inline-block px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
                         item.payment_status === 'SETTLED'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : item.payment_status === 'PARTIAL'
@@ -204,13 +204,13 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
           <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="font-mono font-bold text-xs text-slate-900 block">{item.job_work_reference || 'N/A'}</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-mono font-bold text-sm text-slate-900 block">{item.job_work_reference || 'N/A'}</span>
+                <span className="text-sm text-slate-400">
                   {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
               <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                className={`px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
                   item.payment_status === 'SETTLED'
                     ? 'bg-emerald-50 text-emerald-700'
                     : item.payment_status === 'PARTIAL'
@@ -225,25 +225,25 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
             </div>
 
             <div className="pt-1 border-t border-slate-100">
-              <span className="font-medium text-xs text-slate-900 block">{item.artisan_name}</span>
-              <p className="text-[11px] text-slate-500 mt-0.5">{item.work_details || 'Job work order'}</p>
+              <span className="font-medium text-sm text-slate-900 block">{item.artisan_name}</span>
+              <p className="text-sm text-slate-500 mt-0.5">{item.work_details || 'Job work order'}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t border-slate-100">
               <div>
-                <span className="text-[10px] text-slate-400 block">Job Charge</span>
+                <span className="text-sm text-slate-400 block">Job Charge</span>
                 <span className="font-mono font-bold text-slate-900">{formatINR(item.job_work_amount)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Quantity</span>
+                <span className="text-sm text-slate-400 block">Quantity</span>
                 <span className="font-mono font-medium text-slate-700">{item.quantity || 1} units</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Paid</span>
+                <span className="text-sm text-slate-400 block">Paid</span>
                 <span className="font-mono font-medium text-emerald-700">{formatINR(item.amount_paid)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Remaining Due</span>
+                <span className="text-sm text-slate-400 block">Remaining Due</span>
                 <span className="font-mono font-bold text-rose-600">{formatINR(item.outstanding_amount)}</span>
               </div>
             </div>

@@ -40,9 +40,9 @@ export const Navbar: React.FC = () => {
             </div>
             <div>
               <span className="font-serif-display text-xl font-bold tracking-tight text-brand-950 block leading-tight">
-                YorBalance
+                YorLedger
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 block">
+              <span className="text-sm font-semibold uppercase tracking-wider text-amber-700 block">
                 Saree & Silk Ledger
               </span>
             </div>
@@ -53,7 +53,7 @@ export const Navbar: React.FC = () => {
             {user && (
               <div className="flex items-center gap-3">
                 {isAdmin ? (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-lg border border-purple-200 text-purple-900 text-xs font-semibold">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-lg border border-purple-200 text-purple-900 text-sm font-semibold">
                     <ShieldCheck className="w-4 h-4 text-purple-600" />
                     <span>Admin Portal</span>
                   </div>
@@ -65,14 +65,14 @@ export const Navbar: React.FC = () => {
                         <span className="text-sm font-bold text-slate-900">{shop.name}</span>
                         <Badge status={shop.status} />
                       </div>
-                      <span className="text-xs text-slate-500">{shop.owner_name} • GSTIN: {shop.gstin}</span>
+                      <span className="text-sm text-slate-500">{shop.owner_name} • GSTIN: {shop.gstin}</span>
                     </div>
                   )
                 )}
 
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-rose-700 hover:bg-rose-50 transition-colors text-xs font-medium"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-rose-700 hover:bg-rose-50 transition-colors text-sm font-medium"
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
@@ -85,13 +85,13 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Link
                   to="/admin-login"
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5"
                 >
                   Admin Portal
                 </Link>
                 <Link
                   to="/login"
-                  className="text-xs font-semibold bg-brand-900 text-white px-3.5 py-1.5 rounded-lg hover:bg-brand-950 transition-colors"
+                  className="text-sm font-semibold bg-brand-900 text-white px-3.5 py-1.5 rounded-lg hover:bg-brand-950 transition-colors"
                 >
                   Merchant Sign In
                 </Link>

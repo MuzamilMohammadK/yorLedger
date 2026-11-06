@@ -17,7 +17,7 @@ export const Badge: React.FC<BadgeProps> = ({ status }) => {
   const style = styles[status] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-semibold border ${style}`}>
       <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-current opacity-70"></span>
       {status}
     </span>

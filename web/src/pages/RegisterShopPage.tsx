@@ -237,12 +237,12 @@ export const RegisterShopPage: React.FC = () => {
           <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Shop Registration Application</h2>
-              <p className="text-xs text-slate-500">Provide official business details and JPEG verification documents</p>
+              <p className="text-sm text-slate-500">Provide official business details and JPEG verification documents</p>
             </div>
             <button
               type="button"
               onClick={fillSampleData}
-              className="text-xs font-semibold px-3 py-1.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              className="text-sm font-semibold px-3 py-1.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
             >
               Fill Sample Merchant
             </button>
@@ -255,7 +255,7 @@ export const RegisterShopPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Section 1: Business Identity */}
             <div>
-              <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
                 <Store className="w-4 h-4" /> 1. Business Profile
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -283,7 +283,7 @@ export const RegisterShopPage: React.FC = () => {
 
             {/* Section 2: Taxation & Location */}
             <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
                 <FileText className="w-4 h-4" /> 2. GST & Tax Settings
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -299,7 +299,7 @@ export const RegisterShopPage: React.FC = () => {
                     required
                   />
                   {gstinMessage && (
-                    <p className={`mt-1 text-xs font-medium flex items-center gap-1 ${gstinMessage.isError ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    <p className={`mt-1 text-sm font-medium flex items-center gap-1 ${gstinMessage.isError ? 'text-rose-600' : 'text-emerald-700'}`}>
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       {gstinMessage.text}
                     </p>
@@ -345,26 +345,26 @@ export const RegisterShopPage: React.FC = () => {
             {/* Section 3: Document Verification (JPEG/JPG required) */}
             <div className="pt-4 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider flex items-center gap-1.5">
+                <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wider flex items-center gap-1.5">
                   <UploadCloud className="w-4 h-4" /> 3. Shop Verification Document (JPEG/JPG Format)
                 </h3>
-                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                <span className="text-sm font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
                   Required Format: .JPG / .JPEG
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="text-sm text-slate-500 mb-3">
                 Upload your official GST Certificate, Shop Establishment License, or Business Registration Proof.
               </p>
 
               {documentError && (
-                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{documentError}</span>
                 </div>
               )}
 
               {errors.document && (
-                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                <div className="mb-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{errors.document}</span>
                 </div>
@@ -383,10 +383,10 @@ export const RegisterShopPage: React.FC = () => {
                     <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-3">
                       <ImageIcon className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold text-slate-800 block mb-1">
+                    <span className="text-sm font-bold text-slate-800 block mb-1">
                       Click to upload shop document in JPEG/JPG format
                     </span>
-                    <span className="text-[11px] text-slate-500 block">
+                    <span className="text-sm text-slate-500 block">
                       Supported extensions: .jpg, .jpeg (Maximum size: 5 MB)
                     </span>
                   </label>
@@ -402,10 +402,10 @@ export const RegisterShopPage: React.FC = () => {
                       />
                     </div>
                     <div className="overflow-hidden">
-                      <span className="text-xs font-bold text-slate-900 block truncate">
+                      <span className="text-sm font-bold text-slate-900 block truncate">
                         {documentName || 'Shop_Document.jpg'}
                       </span>
-                      <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                      <span className="text-sm font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
                         <CheckCircle2 className="w-3.5 h-3.5" /> JPEG Format Verified
                       </span>
                     </div>
@@ -414,7 +414,7 @@ export const RegisterShopPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <label
                       htmlFor="shop-document-replace"
-                      className="cursor-pointer text-xs font-semibold px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+                      className="cursor-pointer text-sm font-semibold px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
                     >
                       Change
                     </label>
@@ -440,7 +440,7 @@ export const RegisterShopPage: React.FC = () => {
 
             {/* Section 4: Contact & Access */}
             <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-xs font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <h3 className="text-sm font-bold text-brand-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
                 <Lock className="w-4 h-4" /> 4. Contact & Login Credentials
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -513,7 +513,7 @@ export const RegisterShopPage: React.FC = () => {
             </div>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-600">
+          <div className="mt-6 pt-5 border-t border-slate-100 text-center text-sm text-slate-600">
             Already have a registered merchant account?{' '}
             <Link to="/login" className="font-bold text-brand-900 hover:text-brand-950 underline">
               Sign In here

@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
           <Sparkles className="w-7 h-7" />
         </div>
         <h2 className="font-serif-display text-3xl font-extrabold text-slate-900 tracking-tight">
-          YorBalance
+          YorLedger
         </h2>
         <p className="mt-1 text-sm text-slate-600 font-medium">
           Digital Ledger & GST Billing for Saree & Silk Merchants
@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
         <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/60 rounded-3xl border border-slate-100 sm:px-10">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-slate-900">Merchant Sign In</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 mt-0.5">
               Access your shop's ledger, customer dues, and tax registers
             </p>
           </div>
@@ -124,7 +124,7 @@ export const LoginPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-1">
+            <div className="flex items-center justify-between text-sm pt-1">
               <label className="flex items-center gap-2 text-slate-600 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -160,7 +160,7 @@ export const LoginPage: React.FC = () => {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
+              <div className="relative flex justify-center text-sm uppercase">
                 <span className="bg-white px-3 text-slate-400 font-medium tracking-wider">
                   Or continue with
                 </span>
@@ -199,7 +199,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Quick Demo Fill for evaluation */}
           <div className="mt-6 pt-5 border-t border-slate-100 bg-amber-50/50 -mx-6 -mb-8 px-6 py-4 rounded-b-3xl">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-sm">
               <span className="font-semibold text-amber-900">New Shop?</span>
               <Link
                 to="/register-shop"
@@ -214,7 +214,7 @@ export const LoginPage: React.FC = () => {
         <div className="text-center mt-6">
           <Link
             to="/admin-login"
-            className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+            className="text-sm text-slate-500 hover:text-slate-800 transition-colors"
           >
             Looking for Administrator Portal? Click here
           </Link>
