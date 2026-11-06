@@ -49,25 +49,7 @@ export const PendingApprovalPage: React.FC = () => {
   const [editDocError, setEditDocError] = useState<string | null>(null);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    refreshSession();
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'yorbalance_client_shops' || e.key === 'yorbalance_active_shop_id') {
-        refreshSession();
-      }
-    };
-    window.addEventListener('storage', onStorage);
-
-    const timer = setInterval(() => {
-      refreshSession();
-    }, 2500);
-
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      clearInterval(timer);
-    };
-  }, [refreshSession]);
+  // Shop status is watched live by AuthContext (Firestore listener) — no polling needed.
 
   // If approved, show congratulatory screen and allow redirect to Dashboard
   if (shop?.status === 'APPROVED') {

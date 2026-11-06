@@ -1,21 +1,17 @@
 {
-  "name": "yorbalance-ledger",
+  "name": "yorledger",
   "version": "1.0.0",
   "private": true,
-  "description": "Multi-shop ledger and billing application for saree and silk businesses",
+  "description": "YorLedger \u2014 ledger and billing for saree and silk shops (web, Android APK, desktop)",
   "workspaces": [
     "shared",
-    "functions",
     "web"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-    "dev:web": "npm run dev --workspace=web",
-    "dev:api": "npm run dev --workspace=functions",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
+    "dev": "npm run build --workspace=shared && npm run dev --workspace=web",
+    "build": "npm run build --workspace=shared && npm run build --workspace=web",
+    "test": "npm run build --workspace=shared && npm test --workspace=shared",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:web": "npm run build && firebase deploy --only hosting"
   }
 }

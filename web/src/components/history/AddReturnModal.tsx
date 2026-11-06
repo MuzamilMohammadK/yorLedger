@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Undo2,
-  AlertCircle,
-  CheckCircle2,
-  FileText,
-  Calendar
-} from 'lucide-react';
-import { Transaction, formatINR, formatPaiseToINR } from '@yorbalance/shared';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, AlertTriangle, Minus, Plus } from 'lucide-react';
+import { Transaction, computeReturn, formatPaiseToINR } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
+import { useI18n } from '../../i18n';
+import { todayIST } from '../../lib/data/util';
+import { cache } from '../../lib/data/cache';
+import { Sheet } from '../ledger/NewTransactionModal';
 
 interface AddReturnModalProps {
   isOpen: boolean;
@@ -17,194 +14,116 @@ interface AddReturnModalProps {
   transaction: Transaction | null;
 }
 
-export const AddReturnModal: React.FC<AddReturnModalProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-  transaction
-}) => {
-  const [amountRupees, setAmountRupees] = useState('');
-  const [reason, setReason] = useState('Fabric / Weft Defect');
-  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** Return goods against one bill, item by item (spec §9.5). */
+export const AddReturnModal: React.FC<AddReturnModalProps> = ({ isOpen, onClose, onSuccess, transaction }) => {
+  const { t } = useI18n();
+  const [qty, setQty] = useState<Record<number, number>>({});
+  const [date, setDate] = useState(todayIST());
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setAmountRupees('');
-      setReason('Fabric / Weft Defect');
-      setReturnDate(new Date().toISOString().split('T')[0]);
-      setError(null);
+    if (!isOpen) return;
+    setQty({});
+    setDate(todayIST());
+    setReason('');
+    setFormError(null);
+  }, [isOpen, transaction?.id]);
+
+  // Use the bill's own stored snapshot so the preview matches what is saved.
+  const raw = transaction ? cache.rawBill(transaction.id) : undefined;
+  const returnedQty: Record<string, number> = raw?.returned_qty ?? {};
+
+  const preview = useMemo(() => {
+    if (!raw) return null;
+    const lines = Object.entries(qty).map(([i, q]) => ({ index: Number(i), qty: q })).filter(l => l.qty > 0);
+    if (!lines.length) return null;
+    try {
+      return computeReturn({ items: raw.items, gstBp: raw.gst_bp, taxMode: raw.tax_mode, grandTotal: raw.grand_total,
+                             returnedTotal: raw.returned_total, returnedQty }, lines);
+    } catch {
+      return null;
     }
-  }, [isOpen]);
+  }, [qty, raw]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen || !transaction) return null;
+  const rs = (p: number) => formatPaiseToINR(p, true);
+  const field = 'w-full h-12 px-3 rounded-xl border-2 border-slate-200 bg-white text-base text-slate-900 focus:border-indigo-600 focus:outline-none';
 
-  const currentReturns = transaction.return_paise || 0;
-  const maxReturnPaise = transaction.grand_total_paise - currentReturns;
-  const maxReturnRupees = Math.round(maxReturnPaise / 100);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const amt = parseFloat(amountRupees);
-    if (isNaN(amt) || amt <= 0) {
-      setError('Please enter a valid return amount greater than zero.');
-      return;
-    }
-
-    if (amt > maxReturnRupees) {
-      setError(`Return amount cannot exceed maximum returnable amount of ${formatINR(maxReturnRupees)}`);
-      return;
-    }
-
+  const save = async () => {
+    const lines = Object.entries(qty).map(([i, q]) => ({ index: Number(i), qty: q })).filter(l => l.qty > 0);
+    if (!lines.length) { setFormError(t('nothing_selected')); return; }
+    setBusy(true);
+    setFormError(null);
     try {
-      setLoading(true);
-      await api.recordReturn({
-        transaction_id: transaction.id,
-        amount_rupees: amt,
-        reason: reason.trim() || null,
-        return_date: returnDate
-      });
-
+      await api.recordReturn({ bill_id: transaction.id, returned_on: date, lines, reason: reason || null });
       onSuccess();
       onClose();
-    } catch (err: any) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError(err.message || 'Failed to record return');
-      }
+    } catch (e) {
+      setFormError(e instanceof ApiError ? e.message : navigator.onLine ? t('error_generic') : t('error_offline'));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="p-6 bg-gradient-to-br from-rose-900 via-pink-950 to-slate-950 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-200 border border-rose-400/30">
-              <Undo2 className="w-3.5 h-3.5" /> Credit Return Note
-            </span>
+    <Sheet onClose={onClose} title={t('return_title')}>
+      <div className="p-4 sm:p-6 space-y-5">
+        <p className="text-base text-slate-700">{transaction.party_name} · #{transaction.invoice_number} · {rs(transaction.grand_total_paise)}</p>
+        {formError && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-base flex gap-2">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" /> {formError}
           </div>
+        )}
 
-          <h2 className="font-serif-display text-2xl font-bold text-white tracking-tight">
-            Record Return
-          </h2>
-          <p className="text-xs text-rose-200 mt-1">
-            Deduct returned sarees or materials from {transaction.invoice_number}
-          </p>
-
-          <div className="mt-4 p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-between text-xs">
-            <div>
-              <p className="text-[10px] uppercase font-bold text-rose-300">Invoice Total</p>
-              <p className="font-mono font-bold text-white">{formatPaiseToINR(transaction.grand_total_paise)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] uppercase font-bold text-rose-300">Max Returnable</p>
-              <p className="font-mono font-bold text-amber-300">{formatINR(maxReturnRupees)}</p>
-            </div>
-          </div>
+        <div className="space-y-3">
+          {(transaction.items ?? []).map((it, i) => {
+            const done = returnedQty[String(i)] ?? 0;
+            const left = it.quantity - done;
+            const cur = qty[i] ?? 0;
+            const set = (n: number) => setQty({ ...qty, [i]: Math.max(0, Math.min(left, n)) });
+            return (
+              <div key={it.id} className="rounded-2xl border-2 border-slate-200 p-3">
+                <p className="text-base font-bold text-slate-900">{it.item_name}</p>
+                <p className="text-sm text-slate-600">
+                  {t('bought_qty')}: {it.quantity} · {t('already_returned')}: {done} · {rs(it.rate_paise)}
+                </p>
+                {left > 0 ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-base text-slate-700 flex-1">{t('return_now')}</span>
+                    <button type="button" aria-label="−" onClick={() => set(cur - 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Minus className="w-5 h-5" /></button>
+                    <input inputMode="numeric" value={cur || ''} placeholder="0" aria-label={t('return_now')}
+                      onChange={e => set(parseInt(e.target.value.replace(/\D/g, '') || '0', 10))}
+                      className="w-16 h-12 text-center rounded-xl border-2 border-slate-300 text-xl font-bold" />
+                    <button type="button" aria-label="+" onClick={() => set(cur + 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Plus className="w-5 h-5" /></button>
+                  </div>
+                ) : null}
+                {left > 0 && <p className="mt-1 text-sm text-slate-500">{t('can_return', { n: left })}</p>}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {error && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-base font-semibold text-slate-800">{t('date')}
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+          </label>
+          <label className="text-base font-semibold text-slate-800">{t('reason')}
+            <input value={reason} onChange={e => setReason(e.target.value)} placeholder={t('reason_ph')} className={field} />
+          </label>
+        </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Return Amount (₹) <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
-              <input
-                type="number"
-                step="any"
-                min="1"
-                max={maxReturnRupees}
-                required
-                value={amountRupees}
-                onChange={e => setAmountRupees(e.target.value)}
-                placeholder="e.g. 15000"
-                className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none"
-              />
-            </div>
-          </div>
+        <div className="rounded-2xl bg-slate-900 text-white p-4 flex justify-between items-baseline">
+          <span className="text-lg">{t('return_value')}</span>
+          <span className="text-3xl font-bold">{rs(preview?.totalReduction ?? 0)}</span>
+        </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Reason for Return
-            </label>
-            <select
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
-            >
-              <option value="Fabric / Weft Defect">Fabric / Weft Defect</option>
-              <option value="Zari Korvai Issue">Zari Korvai Issue</option>
-              <option value="Color Shade Mismatch">Color Shade Mismatch</option>
-              <option value="Customer Cancellation">Customer Cancellation</option>
-              <option value="Quality Inspection Rejection">Quality Inspection Rejection</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Return Date
-            </label>
-            <input
-              type="date"
-              required
-              value={returnDate}
-              onChange={e => setReturnDate(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md shadow-rose-600/20 transition-all flex items-center gap-2"
-            >
-              {loading ? (
-                <span>Recording Return...</span>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirm Return</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        <button type="button" onClick={save} disabled={busy || !preview}
+          className="w-full h-14 rounded-2xl bg-indigo-700 text-white text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+          {busy ? <><Loader2 className="w-6 h-6 animate-spin" /> {t('saving')}</> : t('save_return')}
+        </button>
       </div>
-    </div>
+    </Sheet>
   );
 };
-

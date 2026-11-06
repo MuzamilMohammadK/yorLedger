@@ -1,7 +1,6 @@
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
-  Auth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -9,35 +8,38 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from 'firebase/firestore';
 
+// Firebase web config identifies the project; it is not a secret (access is
+// controlled by firestore.rules). Values come from web/.env.production.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'demo-api-key',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'demo-yorbalance.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-yorbalance',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'demo-yorbalance.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789:web:demo'
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const hasRealFirebaseConfig =
-  import.meta.env.VITE_FIREBASE_API_KEY &&
-  import.meta.env.VITE_FIREBASE_API_KEY !== 'demo-api-key';
-
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-
-if (hasRealFirebaseConfig) {
-  try {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    auth = getAuth(app);
-  } catch (err) {
-    console.warn('Real Firebase configuration failed to initialize:', err);
-  }
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error('Firebase config missing: set VITE_FIREBASE_* variables (see web/.env.production).');
 }
 
+export const app = getApps()[0] ?? initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+
+// Offline cache: reads are served locally and writes are queued while the shop
+// has no internet, then synced. This also keeps the free-tier read count low.
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
 export {
-  auth,
-  hasRealFirebaseConfig,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -45,4 +47,3 @@ export {
   GoogleAuthProvider,
   signInWithPopup
 };
-

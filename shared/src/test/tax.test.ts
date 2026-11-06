@@ -45,3 +45,37 @@ describe('Tax Split & Rounding Logic', () => {
   });
 });
 
+
+import { test } from "node:test";
+import { computeReturn } from '../tax.js';
+
+test('spec 9.6: returning 50 of 100 sarees halves a 2,00,000 bill (gross ₹2,000 each)', () => {
+  // ₹1,904.76 + 5% => use rate that makes exactly ₹2,000 gross: taxable ₹2,000, 0% for the example arithmetic
+  const bill = { items: [{ qty: 100, rate: 200000 }], gstBp: 0, taxMode: 'INTRA' as const,
+                 grandTotal: 20000000, returnedTotal: 0, returnedQty: {} };
+  const r = computeReturn(bill, [{ index: 0, qty: 50 }]);
+  assert.strictEqual(r.totalReduction, 10000000);
+});
+
+test('return uses the bill snapshot GST and split', () => {
+  const bill = { items: [{ qty: 10, rate: 1250000 }], gstBp: 500, taxMode: 'INTRA' as const,
+                 grandTotal: 13125000, returnedTotal: 0, returnedQty: {} };
+  const r = computeReturn(bill, [{ index: 0, qty: 2 }]);
+  assert.strictEqual(r.taxableReduction, 2500000);
+  assert.strictEqual(r.cgst + r.sgst, 125000);
+  assert.strictEqual(r.totalReduction, 2625000);
+});
+
+test('cannot return more than remaining quantity', () => {
+  const bill = { items: [{ qty: 3, rate: 100 }], gstBp: 500, taxMode: 'INTER' as const,
+                 grandTotal: 315, returnedTotal: 0, returnedQty: { '0': 2 } };
+  assert.throws(() => computeReturn(bill, [{ index: 0, qty: 2 }]), /only 1 left/);
+});
+
+test('final return clears exactly what remains (no stray paise)', () => {
+  const bill = { items: [{ qty: 3, rate: 333 }], gstBp: 500, taxMode: 'INTRA' as const,
+                 grandTotal: 1049, returnedTotal: 0, returnedQty: {} };
+  const a = computeReturn(bill, [{ index: 0, qty: 1 }]);
+  const b = computeReturn({ ...bill, returnedTotal: a.totalReduction, returnedQty: a.newReturnedQty }, [{ index: 0, qty: 2 }]);
+  assert.strictEqual(a.totalReduction + b.totalReduction, 1049);
+});

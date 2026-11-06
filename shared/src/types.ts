@@ -562,3 +562,42 @@ export interface UpdateGSTSettingsPayload {
   state_code?: string;
 }
 
+
+// ---------------------------------------------------------------------------
+// Spec-aligned bill / payment / return payloads (Firestore data layer).
+// Money in integer paise, GST in basis points.
+// ---------------------------------------------------------------------------
+export type BillKind = 'SALE' | 'PURCHASE' | 'JOB_WORK';
+
+export interface BillItemPayload {
+  name: string;
+  qty: number;   // > 0
+  rate: number;  // paise, >= 0
+}
+
+export interface CreateBillPayload {
+  kind: BillKind;
+  party_id: string;
+  invoice_no: string;        // digits; normalized (leading zeros stripped)
+  bill_date: string;         // YYYY-MM-DD (IST)
+  gst_bp: number;            // copied onto the bill as a snapshot
+  tax_mode_override?: 'INTRA' | 'INTER' | null; // manual override per bill (spec §8.6)
+  items: BillItemPayload[];
+  remind_on?: string | null;
+  remind_lead_days?: 0 | 1 | 3 | 7 | null;
+  notes?: string | null;
+  source?: 'MANUAL' | 'SCAN';
+}
+
+export type PaymentPayload =
+  | { mode: 'CASH'; bill_id: string; amount: number; paid_on: string; collected_by: string; notes?: string | null }
+  | { mode: 'CHEQUE'; bill_id: string; amount: number; cheque_no?: string | null; cheque_date: string;
+      deposit_date?: string | null; clearing_date?: string | null; notes?: string | null }
+  | { mode: 'NEFT'; bill_id: string; amount: number; utr_no: string; txn_date: string; notes?: string | null };
+
+export interface ReturnPayload {
+  bill_id: string;
+  returned_on: string;
+  lines: { index: number; qty: number }[];
+  reason?: string | null;
+}

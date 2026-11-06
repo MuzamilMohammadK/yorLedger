@@ -1,143 +1,71 @@
-# YorBalance — Saree & Silk Shop Ledger & Billing Application
+# YorLedger
 
-A professional, responsive multi-tenant ledger, billing, and dues management application tailored specifically for **saree, silk, and handloom textile merchants**. Built according to the comprehensive **HLD and LLD specification**.
+Ledger and billing for saree and silk shops: sales, purchases, job work, returns,
+dues, cash / cheque / NEFT payments, GST reports. In plain words, in English,
+Telugu, Tamil, Kannada and Hindi.
 
----
+Ships as a **website**, an **Android APK** and a **desktop app**, with releases on GitHub.
 
-## 🏗️ Architecture & Technology Stack
+## Architecture (free Firebase Spark plan)
 
-| Layer | Technology | Details |
-| :--- | :--- | :--- |
-| **Frontend** | React 18, Vite, TypeScript | Single Page Application (PWA ready), mobile-first responsive layout |
-| **Styling** | Tailwind CSS | Indian saree & silk merchant aesthetic (rich crimson/maroon, gold, and slate) |
-| **Authentication** | Firebase Authentication | Email/Password, Google Sign-in, Password Reset |
-| **API & Backend** | Node.js, Express, TypeScript | Modular REST API (deployable on Firebase Cloud Functions or standalone) |
-| **Database** | PostgreSQL | Multi-tenant schema, UUID keys, integer paise currency, basis-points GST |
-| **Shared Domain** | TypeScript npm workspace (`@yorbalance/shared`) | Shared validation, GSTIN Mod-36 checksum, and intra/inter-state tax calculations |
+| Part | What |
+| --- | --- |
+| `web/` | React + Vite + Tailwind app. The same build runs on the web, in the APK (Capacitor) and on desktop (Electron). |
+| `shared/` | Pure TypeScript: GST split, rounding, returns, GSTIN / phone / invoice validation, with unit tests. |
+| `firestore.rules` | **This is the backend.** Tenant isolation, the admin approval gate, SALE invoice uniqueness, UTR uniqueness, payment ≤ due, immutable tax snapshots, append-only payments / returns / audit log. |
+| `scripts/set-admin.mjs` | One-time admin provisioning via a Firebase custom claim. There is no admin signup. |
 
----
+There is no server and no Postgres. Money is stored as integer paise and GST as basis points.
+Every bill keeps its own GST rate and tax mode snapshot, and `grand_total` never changes.
+Returns and payments move `returned_total` / `paid_total`, and `amount_due` is always
+`grand_total − paid_total − returned_total`. Firestore's offline cache lets the app keep
+working on a weak connection.
 
-## 📦 Project Structure (npm workspaces)
+### Firestore layout
 
-```text
-YorBalance/
-├── shared/                       # Pure TypeScript shared domain logic
-│   ├── src/
-│   │   ├── gst.ts                # GSTIN regex, Mod-36 checksum validator, phone & invoice normalizers
-│   │   ├── states.ts             # All 36 Indian states & UTs with official 2-digit GST codes
-│   │   ├── tax.ts                # Intra-state (CGST+SGST) vs Inter-state (IGST) math in paise
-│   │   └── types.ts              # Shop, User, Verification, and payload interfaces
-│   └── package.json
-│
-├── functions/                    # Node.js + Express Backend API
-│   ├── src/
-│   │   ├── app.ts                # Express application setup
-│   │   ├── server.ts             # Standalone development server (Port 5000)
-│   │   ├── index.ts              # Firebase Cloud Function HTTPS export
-│   │   ├── middleware/auth.ts    # Firebase ID Token verification & Admin role checks
-│   │   ├── db/
-│   │   │   ├── index.ts          # PostgreSQL pool client + in-memory store for offline dev
-│   │   │   └── migrations/       # Forward-only SQL migrations (001_initial_schema.sql)
-│   │   ├── routes/
-│   │   │   ├── auth.ts           # /api/v1/auth: register-shop, me, resubmit
-│   │   │   └── admin.ts          # /api/v1/admin: shops review queue, approve/reject decision
-│   │   └── tests/auth.test.ts    # Integration tests for auth and approval flow
-│   └── package.json
-│
-├── web/                          # React + Vite + Tailwind CSS Frontend
-│   ├── src/
-│   │   ├── components/           # UI Atoms (Button, Input, Select, Badge, Alert, Modal, Navbar)
-│   │   │   ├── ProtectedRoute.tsx# Shop approval gate (blocks unapproved merchants)
-│   │   │   └── AdminRoute.tsx    # Admin security gate
-│   │   ├── context/AuthContext.tsx# Firebase Auth & Session state provider
-│   │   ├── lib/                  # api.ts (REST client) and firebase.ts (SDK initialization)
-│   │   └── pages/
-│   │       ├── LoginPage.tsx              # Merchant login (Email, Google, Password toggle)
-│   │       ├── RegisterShopPage.tsx       # Live GSTIN validation, state derivation, GST %
-│   │       ├── ForgotPasswordPage.tsx     # Password reset dispatch
-│   │       ├── PendingApprovalPage.tsx    # Verification queue & rejection resubmit form
-│   │       ├── AdminLoginPage.tsx         # Dedicated restricted admin login
-│   │       ├── AdminDashboardPage.tsx     # Review pending shops, approve or reject with reason
-│   │       └── DashboardPlaceholderPage.tsx # Approved shop welcome & Phase 2 transition
-│   └── package.json
-│
-└── package.json                  # Root workspace definition
+```
+users/{uid}                        shop_id, role
+users/{uid}/notifications/{id}     in-app inbox
+shops/{shopId}                     profile, status PENDING | APPROVED | REJECTED, default_gst_bp
+shops/{shopId}/private/document    verification JPEG (owner + admin only)
+shops/{shopId}/verifications/{id}  admin review rounds
+shops/{shopId}/parties/{id}
+shops/{shopId}/bills/{id}          kind, invoice_no, items, tax snapshot, totals
+shops/{shopId}/saleInvoices/{no}   SALE invoice number lock
+shops/{shopId}/payments/{id}       CASH | CHEQUE | NEFT
+shops/{shopId}/utrs/{utr}          UTR lock
+shops/{shopId}/returns/{id}
+shops/{shopId}/audit/{id}
+shops/{shopId}/settings/{doc}
 ```
 
----
+## Run locally
 
-## 🚀 Getting Started Locally
-
-### 1. Prerequisites
-- **Node.js**: v18 or later (tested on v24)
-- **npm**: v9 or later (tested on v11)
-
-### 2. Install Dependencies
-Run from the root directory:
 ```bash
-npm install --install-links
+npm install
+npm test        # shared domain tests
+npm run dev     # http://localhost:5173
 ```
 
-### 3. Build Shared Packages
-```bash
-npm run build --workspace=shared
-```
+`web/.env.production` holds the Firebase web config. It identifies the project and is not a secret;
+access is controlled by `firestore.rules`.
 
-### 4. Run Unit and Integration Tests
-```bash
-npm test --workspaces
-```
-- **9 Unit Tests** in `@yorbalance/shared`: GSTIN checksum, format validation, phone/invoice normalizers, intra-state CGST+SGST, inter-state IGST, and odd-paise rounding.
-- **5 Integration Tests** in `@yorbalance/functions`: API health check, unauthenticated rejection, shop registration, admin queue retrieval, and admin approval decision.
+## One-time setup (project owner)
 
-### 5. Start the Development Servers
-Start both backend API and frontend in parallel:
-```bash
-# Terminal 1: Start API server (http://localhost:5000)
-npm run dev:api
+1. Firebase console → **Firestore Database** → create a database (production mode).
+2. Authentication → enable **Email/Password** (and Google for the website).
+3. Deploy the rules and indexes: `npx firebase-tools deploy --only firestore`
+4. Make the first admin. The account must exist in Firebase Auth:
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json node scripts/set-admin.mjs you@example.com
+   ```
+   Keep `service-account.json` out of git. It is ignored.
 
-# Terminal 2: Start Vite Web app (http://localhost:5173)
-npm run dev:web
-```
-Or simultaneously from root:
-```bash
-npm run dev
-```
+## Translations
 
----
+The Telugu, Tamil, Kannada and Hindi strings in `web/src/i18n/strings.ts` were drafted
+by machine and **must be checked by a native speaker** before release. A missing key falls back to English.
 
-## 🛡️ Phase 1 User Journeys Implemented
+## GST disclaimer
 
-### Merchant Journey
-1. **Register Shop (`/register-shop`)**:
-   - Enter Shop Name, Proprietor Name, Mobile Number, Email, and Shop Address.
-   - Enter a 15-character **GSTIN** (e.g. `29AAAAA0000A1Z5`). The validator live-computes the **Mod-36 Luhn Checksum** and automatically maps the first 2 digits to the official State (e.g., `29` -> Karnataka).
-   - Select default GST rate (default 5% for silk sarees).
-   - Enter password (minimum 8 characters) and confirm password.
-   - On submission, the shop is saved in PostgreSQL with status **`PENDING`**.
-2. **Pending Approval (`/pending-approval`)**:
-   - The merchant is routed to this screen. Access to the ledger and dues is locked until approved.
-   - If rejected by the admin, the merchant sees the **exact rejection reason** and can update the flagged details directly in an inline form and resubmit.
-3. **Approved Shop (`/dashboard`)**:
-   - Once approved by the administrator, the merchant is granted entry to the Shop Dashboard.
-
-### Administrator Journey
-1. **Admin Login (`/admin-login`)**:
-   - Administrative credentials are not publicly registrable.
-   - For local development, use:
-     - **Email**: `admin@yorbalance.com`
-     - **Password**: `admin123`
-2. **Admin Verification Portal (`/admin`)**:
-   - Displays all registered shops with tabs: `Pending Review`, `Approved`, `Rejected`, and `All`.
-   - Admin reviews shop details, GSTIN, proprietor name, contact numbers, and address.
-   - **Approve**: Instantly sets status to `APPROVED`, unlocking the ledger for that merchant.
-   - **Reject**: Prompts for a specific reason, logs the round in `shop_verifications`, and notifies the shop.
-
----
-
-## ⏭️ Ready for Phase 2: Dashboard Development
-With Phase 1 complete, verified, and tested, the project is ready for **Phase 2 — Dashboard**:
-- Summary cards (Total Transactions, Pending Dues, Settled, Total Value, Net Balance)
-- Sales vs Purchases and Monthly Sales interactive charts (Recharts)
-- Recent Transactions table
-- Circular swipe navigation setup (Party → Sales → Purchases)
+Reports are accounting summaries, not a filed GST return. Have an accountant check them before filing.

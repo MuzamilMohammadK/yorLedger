@@ -15,3 +15,7 @@ HLD_LLD_extracted.txt
 extract_docx.ps1
 docx_unpacked/
 .firebase/
+
+# Firebase admin credentials (never commit)
+service-account*.json
+*-firebase-adminsdk-*.json

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -21,7 +21,7 @@ import { SettingsPage } from './pages/SettingsPage';
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
           <Navbar />
@@ -58,7 +58,7 @@ export const App: React.FC = () => {
           </main>
         </div>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 };
 export default App;

@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   auth,
-  hasRealFirebaseConfig,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -9,8 +9,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from '../lib/firebase';
-import { api, setAuthTokenGetter, ApiError } from '../lib/api';
+import { getMe, registerShop as registerShopDoc, watchShop, latestVerification as fetchLatestVerification } from '../lib/data/session';
 import { User, Shop, ShopVerification, RegisterShopPayload } from '@yorbalance/shared';
+import { setActiveShop } from '../lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -32,279 +33,128 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Local storage keys for mock/dev session persistence
-const DEV_SESSION_KEY = 'yorbalance_dev_session';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
   const [latestVerification, setLatestVerification] = useState<ShopVerification | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const shopWatch = useRef<(() => void) | null>(null);
 
-  // Token retrieval function for API requests
-  const getToken = useCallback(async (): Promise<string | null> => {
-    if (hasRealFirebaseConfig && auth?.currentUser) {
-      return await auth.currentUser.getIdToken();
-    }
-    const saved = localStorage.getItem(DEV_SESSION_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.role === 'ADMIN') return 'dev-admin';
-        return `dev-owner-${parsed.email}`;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }, []);
-
+  // Keep the data layer pointed at the signed-in user's own shop.
   useEffect(() => {
-    setAuthTokenGetter(getToken);
-  }, [getToken]);
+    setActiveShop(shop);
+  }, [shop]);
+
+  const clear = () => {
+    shopWatch.current?.();
+    shopWatch.current = null;
+    setUser(null);
+    setShop(null);
+    setLatestVerification(null);
+  };
 
   const refreshSession = useCallback(async () => {
     try {
-      const token = await getToken();
-      if (!token && !auth?.currentUser) {
-        setUser(null);
+      const me = await getMe();
+      if (!me) {
+        // Signed in to Firebase but no shop registered yet (e.g. first Google sign-in).
+        shopWatch.current?.();
+        shopWatch.current = null;
+        setUser(auth.currentUser ? {
+          id: auth.currentUser.uid, firebase_uid: auth.currentUser.uid, shop_id: null,
+          email: auth.currentUser.email ?? '', role: 'OWNER',
+          created_at: auth.currentUser.metadata.creationTime ?? new Date().toISOString()
+        } : null);
         setShop(null);
         setLatestVerification(null);
-        setLoading(false);
         return;
       }
-
-      let isAdminClaim = false;
-      if (auth?.currentUser) {
-        try {
-          const tokenResult = await auth.currentUser.getIdTokenResult();
-          isAdminClaim = !!tokenResult.claims.admin || auth.currentUser.email?.toLowerCase() === 'muzamilmohammadk@gmail.com';
-        } catch {}
-      }
-
-      try {
-        const data = await api.getMe();
-        if (data && data.user) {
-          if (isAdminClaim) {
-            data.user.role = 'ADMIN';
-          }
-          setUser(data.user);
-          setShop(data.shop);
-          setLatestVerification(data.latest_verification || null);
-          return;
-        }
-      } catch (apiErr: any) {
-        console.warn('API getMe error, using auth token session fallback:', apiErr);
-      }
-
-      if (auth?.currentUser) {
-        setUser({
-          id: auth.currentUser.uid,
-          shop_id: null,
-          firebase_uid: auth.currentUser.uid,
-          email: auth.currentUser.email || '',
-          role: isAdminClaim ? 'ADMIN' : 'OWNER',
-          created_at: auth.currentUser.metadata.creationTime || new Date().toISOString()
-        });
-        return;
-      }
-
-      const saved = localStorage.getItem(DEV_SESSION_KEY);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setUser({
-            id: parsed.uid || 'dev-id',
-            shop_id: parsed.shop_id || null,
-            firebase_uid: parsed.uid || 'dev-id',
-            email: parsed.email,
-            role: parsed.role,
-            created_at: new Date().toISOString()
-          });
-          return;
-        } catch {}
-      }
-
-      setUser(null);
-      setShop(null);
-      setLatestVerification(null);
-    } catch (err: any) {
-      // If unauthorized or stale dev token, clear localStorage session
-      if (err?.status === 401 || err?.code === 'UNAUTHORIZED') {
-        localStorage.removeItem(DEV_SESSION_KEY);
-      }
-      setUser(null);
-      setShop(null);
-      setLatestVerification(null);
+      setUser(me.user);
+      setShop(me.shop);
+      setLatestVerification(me.latest_verification ?? null);
+      // Live status: approval/rejection by the admin shows up immediately.
+      shopWatch.current?.();
+      shopWatch.current = me.shop
+        ? watchShop(me.shop.id, async s => {
+            setShop(s);
+            if (s) setLatestVerification(await fetchLatestVerification(s.id));
+          })
+        : null;
+    } catch (err) {
+      console.error('Session refresh failed:', err);
+      clear();
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
-  // Listen to Firebase Auth or restore dev session
   useEffect(() => {
-    if (hasRealFirebaseConfig && auth) {
-      const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-        if (firebaseUser) {
-          await refreshSession();
-        } else {
-          setUser(null);
-          setShop(null);
-          setLatestVerification(null);
-          setLoading(false);
-        }
-      });
-      return () => unsubscribe();
-    } else {
-      // Dev mode: check localStorage
-      const saved = localStorage.getItem(DEV_SESSION_KEY);
-      if (saved) {
-        refreshSession();
+    const unsub = onAuthStateChanged(auth, async fbUser => {
+      if (fbUser) {
+        await refreshSession();
       } else {
+        clear();
         setLoading(false);
       }
-    }
+    });
+    return () => {
+      unsub();
+      shopWatch.current?.();
+    };
   }, [refreshSession]);
 
-  const loginWithEmail = async (email: string, pass: string) => {
+  const withLoading = async (fn: () => Promise<void>) => {
     setLoading(true);
     try {
-      if (hasRealFirebaseConfig && auth) {
-        await signInWithEmailAndPassword(auth, email, pass);
-        await refreshSession();
-      } else {
-        // Dev fallback mode
-        localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email, role: 'OWNER' }));
-        await refreshSession();
-      }
+      await fn();
     } finally {
       setLoading(false);
     }
   };
 
-  const loginAsAdmin = async (email: string, pass: string) => {
-    setLoading(true);
-    const cleanEmail = email.trim().toLowerCase();
-    try {
-      const isConfiguredAdmin =
-        (cleanEmail === 'muzamilmohammadk@gmail.com' && pass === 'GHI#agh%(^') ||
-        (cleanEmail === 'admin@yorbalance.com' && pass === 'admin123');
+  const loginWithEmail = (email: string, pass: string) =>
+    withLoading(async () => {
+      await signInWithEmailAndPassword(auth, email.trim(), pass);
+      await refreshSession();
+    });
 
-      if (hasRealFirebaseConfig && auth) {
-        try {
-          const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
-          const idToken = await cred.user.getIdTokenResult();
-          const isAdminUser = !!idToken.claims.admin || cleanEmail === 'muzamilmohammadk@gmail.com';
-          if (!isAdminUser && !isConfiguredAdmin) {
-            await signOut(auth);
-            throw new Error('Access restricted: this account does not have administrator privileges.');
-          }
-          localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN', uid: cred.user.uid }));
-          await refreshSession();
-          return;
-        } catch (firebaseErr: any) {
-          // If the password matches the administrator credentials configured by user, authenticate as Admin
-          if (isConfiguredAdmin) {
-            localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN' }));
-            await refreshSession();
-            return;
-          }
-          throw firebaseErr;
-        }
-      } else {
-        if (isConfiguredAdmin) {
-          localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: cleanEmail, role: 'ADMIN' }));
-          await refreshSession();
-        } else {
-          throw new Error('Invalid Administrator credentials.');
-        }
+  // Admin access is decided only by the `admin` custom claim (scripts/set-admin.mjs).
+  const loginAsAdmin = (email: string, pass: string) =>
+    withLoading(async () => {
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const token = await cred.user.getIdTokenResult(true);
+      if (token.claims.admin !== true) {
+        await signOut(auth);
+        throw new Error('This account does not have administrator access.');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+      await refreshSession();
+    });
 
-  const loginWithGoogle = async () => {
-    setLoading(true);
-    try {
-      if (hasRealFirebaseConfig && auth) {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-        await refreshSession();
-      } else {
-        // Dev mode simulation
-        const mockEmail = 'demo.merchant@gmail.com';
-        localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email: mockEmail, role: 'OWNER' }));
-        await refreshSession();
+  const loginWithGoogle = () =>
+    withLoading(async () => {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      await refreshSession();
+    });
+
+  const registerShop = (email: string, pass: string, shopPayload: Omit<RegisterShopPayload, 'email'>) =>
+    withLoading(async () => {
+      // A Google-signed-in user registering a shop already has a Firebase account.
+      if (!auth.currentUser) {
+        await createUserWithEmailAndPassword(auth, email.trim(), pass);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const registerShop = async (
-    email: string,
-    pass: string,
-    shopPayload: Omit<RegisterShopPayload, 'email'>
-  ) => {
-    setLoading(true);
-    try {
-      let uid = 'dev-uid-' + Date.now();
-      if (hasRealFirebaseConfig && auth) {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        uid = cred.user.uid;
-      } else {
-        localStorage.setItem(DEV_SESSION_KEY, JSON.stringify({ email, role: 'OWNER', uid }));
-      }
-
-      // Call API to create Shop and User records in database
-      const fullPayload: RegisterShopPayload = {
-        ...shopPayload,
-        email
-      };
-
-      const res = await api.registerShop(fullPayload);
-      if (res.shop?.id) {
-        try {
-          localStorage.setItem('yorbalance_active_shop_id', res.shop.id);
-        } catch {}
-      }
-      setUser(res.user);
-      setShop(res.shop);
-      setLatestVerification(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+      await registerShopDoc({ ...shopPayload, email: auth.currentUser?.email ?? email });
+      await refreshSession();
+    });
 
   const sendResetEmail = async (email: string) => {
-    if (hasRealFirebaseConfig && auth) {
-      await sendPasswordResetEmail(auth, email);
-    } else {
-      // Simulate successful email dispatch
-      await new Promise(r => setTimeout(r, 600));
-    }
+    await sendPasswordResetEmail(auth, email.trim());
   };
 
-  const logout = async () => {
-    setLoading(true);
-    try {
-      if (hasRealFirebaseConfig && auth) {
-        await signOut(auth);
-      }
-      localStorage.removeItem(DEV_SESSION_KEY);
-      setUser(null);
-      setShop(null);
-      setLatestVerification(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isAdmin = user?.role === 'ADMIN';
-  const isApproved = shop?.status === 'APPROVED';
-  const isPending = shop?.status === 'PENDING';
-  const isRejected = shop?.status === 'REJECTED';
+  const logout = () =>
+    withLoading(async () => {
+      await signOut(auth);
+      clear();
+    });
 
   return (
     <AuthContext.Provider
@@ -313,10 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         shop,
         latestVerification,
         loading,
-        isAdmin,
-        isApproved,
-        isPending,
-        isRejected,
+        isAdmin: user?.role === 'ADMIN',
+        isApproved: shop?.status === 'APPROVED',
+        isPending: shop?.status === 'PENDING',
+        isRejected: shop?.status === 'REJECTED',
         loginWithEmail,
         loginWithGoogle,
         loginAsAdmin,
@@ -336,4 +186,3 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
   return ctx;
 };
-

@@ -1,18 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  CreditCard,
-  Building2,
-  Calendar,
-  FileText,
-  AlertCircle,
-  CheckCircle2,
-  Banknote,
-  Landmark,
-  Receipt
-} from 'lucide-react';
-import { Party, formatINR } from '@yorbalance/shared';
+import React, { useEffect, useState } from 'react';
+import { Banknote, Landmark, Receipt, Loader2, AlertTriangle } from 'lucide-react';
+import { Party, PaymentPayload, Transaction, formatPaiseToINR } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
+import { useI18n } from '../../i18n';
+import { todayIST } from '../../lib/data/util';
+import { Sheet } from '../ledger/NewTransactionModal';
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -24,409 +16,199 @@ interface RecordPaymentModalProps {
   initialInvoiceNumber?: string;
   initialRemainingRupees?: number;
   parties?: Party[];
+  /** Values read from a scanned cheque / bank screenshot. */
+  scanned?: { mode?: 'CHEQUE' | 'NEFT'; amount?: string; utr_no?: string; cheque_no?: string; date?: string } | null;
+}
+
+type Mode = 'CASH' | 'CHEQUE' | 'NEFT';
+const MODES: { mode: Mode; icon: typeof Banknote }[] = [
+  { mode: 'CASH', icon: Banknote },
+  { mode: 'CHEQUE', icon: Receipt },
+  { mode: 'NEFT', icon: Landmark }
+];
+
+function toPaise(v: string): number | null {
+  const s = v.trim();
+  if (!/^\d+(\.\d{0,2})?$/.test(s)) return null;
+  const [w, f = ''] = s.split('.');
+  return parseInt(w, 10) * 100 + parseInt((f + '00').slice(0, 2), 10);
 }
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-  initialPartyId,
-  initialPartyName,
-  initialTransactionId,
-  initialInvoiceNumber,
-  initialRemainingRupees,
-  parties = []
+  isOpen, onClose, onSuccess, initialTransactionId, scanned
 }) => {
-  const [partyId, setPartyId] = useState(initialPartyId || '');
-  const [transactionId, setTransactionId] = useState(initialTransactionId || '');
-  const [amountRupees, setAmountRupees] = useState(initialRemainingRupees ? initialRemainingRupees.toString() : '');
-  const [paymentMode, setPaymentMode] = useState<'CASH' | 'CHEQUE' | 'NEFT'>('NEFT');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [chequeNumber, setChequeNumber] = useState('');
-  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
+  const { t } = useI18n();
+  const [bill, setBill] = useState<Transaction | null>(null);
+  const [mode, setMode] = useState<Mode>('CASH');
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(todayIST());
+  const [collectedBy, setCollectedBy] = useState('');
+  const [chequeNo, setChequeNo] = useState('');
   const [depositDate, setDepositDate] = useState('');
-  const [clearingStatus, setClearingStatus] = useState<'PENDING' | 'CLEARED' | 'BOUNCED'>('PENDING');
+  const [clearingDate, setClearingDate] = useState('');
+  const [utr, setUtr] = useState('');
   const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setPartyId(initialPartyId || (parties[0]?.id || ''));
-      setTransactionId(initialTransactionId || '');
-      setAmountRupees(initialRemainingRupees !== undefined && initialRemainingRupees > 0 ? initialRemainingRupees.toString() : '');
-      setPaymentMode('NEFT');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
-      setReferenceNumber('');
-      setChequeNumber('');
-      setDepositDate('');
-      setClearingStatus('PENDING');
-      setNotes('');
-      setError(null);
-    }
-  }, [isOpen, initialPartyId, initialTransactionId, initialRemainingRupees, parties]);
+    if (!isOpen || !initialTransactionId) return;
+    setBill(null);
+    setErrors({});
+    setFormError(null);
+    setMode(scanned?.mode ?? 'CASH');
+    setDate(scanned?.date ?? todayIST());
+    setUtr(scanned?.utr_no ?? '');
+    setChequeNo(scanned?.cheque_no ?? '');
+    setCollectedBy('');
+    setDepositDate('');
+    setClearingDate('');
+    setNotes('');
+    api.getTransactionDetails(initialTransactionId)
+      .then(({ transaction }) => {
+        setBill(transaction);
+        setAmount(scanned?.amount ?? (transaction.pending_paise / 100).toFixed(2).replace(/\.00$/, ''));
+      })
+      .catch(e => setFormError(e.message));
+  }, [isOpen, initialTransactionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 
-  const currentParty = parties.find(p => p.id === partyId) || (initialPartyName ? { name: initialPartyName } : null);
-  const maxAllowed = initialRemainingRupees !== undefined ? initialRemainingRupees : null;
+  const incoming = bill?.type === 'SALE'; // SALE: we collect. PURCHASE / JOB_WORK: we pay.
+  const rs = (p: number) => formatPaiseToINR(p, true);
+  const field = 'w-full h-12 px-3 rounded-xl border-2 border-slate-200 bg-white text-base text-slate-900 focus:border-indigo-600 focus:outline-none';
+  const err = (k: string) => errors[k] && <p className="mt-1 text-sm text-rose-600">{errors[k]}</p>;
+  const paise = toPaise(amount);
+  const tooMuch = bill && paise !== null && paise > bill.pending_paise;
 
-  const handleQuickAmount = (ratio: number) => {
-    if (maxAllowed !== null && maxAllowed > 0) {
-      const amt = Math.round(maxAllowed * ratio);
-      setAmountRupees(amt.toString());
-    }
-  };
+  const save = async () => {
+    if (!bill) return;
+    const errs: Record<string, string> = {};
+    if (!paise) errs.amount = t('required');
+    else if (tooMuch) errs.amount = t('more_than_due');
+    if (mode === 'CASH' && !collectedBy.trim()) errs.collected_by = t('required');
+    if (mode === 'NEFT' && !utr.trim()) errs.utr_no = t('required');
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+    let payload: PaymentPayload;
+    if (mode === 'CASH') payload = { mode, bill_id: bill.id, amount: paise!, paid_on: date, collected_by: collectedBy, notes };
+    else if (mode === 'CHEQUE') payload = { mode, bill_id: bill.id, amount: paise!, cheque_no: chequeNo, cheque_date: date,
+                                            deposit_date: depositDate || null, clearing_date: clearingDate || null, notes };
+    else payload = { mode, bill_id: bill.id, amount: paise!, utr_no: utr, txn_date: date, notes };
 
-    const amt = parseFloat(amountRupees);
-    if (isNaN(amt) || amt <= 0) {
-      setError('Please enter a valid payment amount greater than zero.');
-      return;
-    }
-
-    if (maxAllowed !== null && amt > maxAllowed) {
-      setError(`Payment cannot exceed outstanding balance of ${formatINR(maxAllowed)}`);
-      return;
-    }
-
-    if (paymentMode === 'CHEQUE' && !chequeNumber.trim()) {
-      setError('Cheque Number is mandatory for Cheque payments.');
-      return;
-    }
-
-    if (!partyId) {
-      setError('Please select or verify the party.');
-      return;
-    }
-
+    setBusy(true);
+    setFormError(null);
     try {
-      setLoading(true);
-      await api.recordPayment({
-        party_id: partyId,
-        transaction_id: transactionId || null,
-        amount_rupees: amt,
-        payment_mode: paymentMode,
-        payment_date: paymentDate,
-        reference_number: referenceNumber.trim() || null,
-        cheque_number: chequeNumber.trim() || null,
-        cheque_date: paymentMode === 'CHEQUE' ? chequeDate : null,
-        deposit_date: paymentMode === 'CHEQUE' && depositDate ? depositDate : null,
-        clearing_status: paymentMode === 'CHEQUE' ? clearingStatus : 'CLEARED',
-        notes: notes.trim() || null
-      });
-
+      await api.recordPayment(payload);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError(err.message || 'Failed to record payment');
-      }
+    } catch (e) {
+      if (e instanceof ApiError) { setFormError(e.message); if (e.fields) setErrors(e.fields); }
+      else setFormError(navigator.onLine ? t('error_generic') : t('error_offline'));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="p-6 bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-950 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/20 text-purple-200 border border-purple-400/30">
-              <CreditCard className="w-3.5 h-3.5" /> Payment Receipt & Voucher
-            </span>
+    <Sheet onClose={onClose} title={incoming ? t('got_money') : t('gave_money')}>
+      <div className="p-4 sm:p-6 space-y-5">
+        {formError && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-base flex gap-2">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" /> {formError}
           </div>
-
-          <h2 className="font-serif-display text-2xl font-bold text-white tracking-tight">
-            Record Payment
-          </h2>
-          <p className="text-xs text-purple-200 mt-1">
-            Instantly update outstanding balances, cheque clearing, and bank settlements.
-          </p>
-
-          {/* Context pill if tied to specific invoice */}
-          {initialInvoiceNumber && (
-            <div className="mt-4 p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-purple-300">Invoice Reference</p>
-                <p className="font-mono font-bold text-white text-sm">{initialInvoiceNumber}</p>
-                <p className="text-xs text-purple-200">{currentParty?.name}</p>
-              </div>
-              {maxAllowed !== null && (
-                <div className="text-right">
-                  <p className="text-[10px] uppercase font-bold text-purple-300">Remaining Balance</p>
-                  <p className="font-mono font-bold text-amber-300 text-base">{formatINR(maxAllowed)}</p>
-                </div>
-              )}
+        )}
+        {!bill ? (
+          !formError && <div className="py-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
+        ) : (
+          <>
+            <div className={`rounded-2xl p-4 ${incoming ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'}`}>
+              <p className="text-base font-semibold">{bill.party_name} · #{bill.invoice_number}</p>
+              <p className="text-sm opacity-80">{incoming ? t('balance_due') : t('balance_to_pay')}</p>
+              <p className="text-3xl font-bold">{rs(bill.pending_paise)}</p>
             </div>
-          )}
-        </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {error && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* If no initial party provided, show party select */}
-          {!initialPartyId && (
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Party / Merchant <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={partyId}
-                onChange={e => setPartyId(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              >
-                <option value="">Select a party</option>
-                {parties.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.type})
-                  </option>
+              <p className="text-base font-semibold text-slate-800 mb-2">{t('how_paid')}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {MODES.map(({ mode: m, icon: Icon }) => (
+                  <button key={m} type="button" onClick={() => setMode(m)}
+                    className={`min-h-[72px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 ${mode === m ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-200 text-slate-600'}`}>
+                    <Icon className="w-7 h-7" />
+                    <span className="text-base font-bold">{t(`mode_${m}`)}</span>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
-          )}
 
-          {/* Payment Amount */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Payment Amount (₹) <span className="text-rose-500">*</span>
-              </label>
-              {maxAllowed !== null && maxAllowed > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAmount(1)}
-                    className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-semibold text-[10px] hover:bg-purple-100"
-                  >
-                    Full (100%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAmount(0.5)}
-                    className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-semibold text-[10px] hover:bg-purple-100"
-                  >
-                    Half (50%)
-                  </button>
+            <div>
+              <label className="block text-base font-semibold text-slate-800 mb-1">{t('amount')} ₹</label>
+              <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+                className={`${field} text-2xl font-bold h-14 ${tooMuch ? 'border-rose-500' : ''}`} />
+              {tooMuch && <p className="mt-1 text-sm text-rose-600">{t('more_than_due')}</p>}
+              {err('amount')}
+              <button type="button" onClick={() => setAmount((bill.pending_paise / 100).toFixed(2).replace(/\.00$/, ''))}
+                className="mt-2 text-base font-semibold text-indigo-700 underline">{t('full_amount')}</button>
+            </div>
+
+            {mode === 'CASH' && (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-base font-semibold text-slate-800">{t('date')}
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                </label>
+                <label className="text-base font-semibold text-slate-800">{incoming ? t('collected_by') : t('paid_by')}
+                  <input value={collectedBy} onChange={e => setCollectedBy(e.target.value)} className={field} />
+                  {err('collected_by')}
+                </label>
+              </div>
+            )}
+
+            {mode === 'CHEQUE' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-base font-semibold text-slate-800">{t('cheque_no')}
+                    <input inputMode="numeric" value={chequeNo} onChange={e => setChequeNo(e.target.value.replace(/\D/g, ''))} className={field} />
+                  </label>
+                  <label className="text-base font-semibold text-slate-800">{t('cheque_date')}
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                  </label>
                 </div>
-              )}
-            </div>
-            <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
-              <input
-                type="number"
-                step="any"
-                min="1"
-                max={maxAllowed !== null ? maxAllowed : undefined}
-                required
-                value={amountRupees}
-                onChange={e => setAmountRupees(e.target.value)}
-                placeholder="e.g. 50000"
-                className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-base font-semibold text-slate-800">{t('deposit_date')} <span className="font-normal text-slate-500">({t('later_ok')})</span>
+                    <input type="date" value={depositDate} onChange={e => setDepositDate(e.target.value)} className={field} />
+                  </label>
+                  <label className="text-base font-semibold text-slate-800">{t('clearing_date')} <span className="font-normal text-slate-500">({t('later_ok')})</span>
+                    <input type="date" value={clearingDate} onChange={e => setClearingDate(e.target.value)} className={field} />
+                  </label>
+                </div>
+              </div>
+            )}
 
-          {/* Payment Method Selector */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Payment Method <span className="text-rose-500">*</span>
+            {mode === 'NEFT' && (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-base font-semibold text-slate-800">{t('utr_no')}
+                  <input value={utr} onChange={e => setUtr(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())} className={`${field} font-mono`} />
+                  {err('utr_no')}
+                </label>
+                <label className="text-base font-semibold text-slate-800">{t('txn_date')}
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                </label>
+              </div>
+            )}
+
+            <label className="block text-base font-semibold text-slate-800">{t('notes')}
+              <input value={notes} onChange={e => setNotes(e.target.value)} className={field} />
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMode('NEFT')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border font-bold transition-all ${
-                  paymentMode === 'NEFT'
-                    ? 'border-purple-600 bg-purple-50 text-purple-800 shadow-sm ring-1 ring-purple-600'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Landmark className="w-4 h-4 mb-1" />
-                <span>NEFT / RTGS / UPI</span>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setPaymentMode('CHEQUE')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border font-bold transition-all ${
-                  paymentMode === 'CHEQUE'
-                    ? 'border-purple-600 bg-purple-50 text-purple-800 shadow-sm ring-1 ring-purple-600'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Receipt className="w-4 h-4 mb-1" />
-                <span>Bank Cheque</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMode('CASH')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border font-bold transition-all ${
-                  paymentMode === 'CASH'
-                    ? 'border-purple-600 bg-purple-50 text-purple-800 shadow-sm ring-1 ring-purple-600'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Banknote className="w-4 h-4 mb-1" />
-                <span>Cash Voucher</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Conditional Fields: NEFT */}
-          {paymentMode === 'NEFT' && (
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Bank UTR / Transaction Reference #
-              </label>
-              <input
-                type="text"
-                value={referenceNumber}
-                onChange={e => setReferenceNumber(e.target.value)}
-                placeholder="e.g. UTR1029384756 or UPI Reference ID"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
-            </div>
-          )}
-
-          {/* Conditional Fields: CHEQUE */}
-          {paymentMode === 'CHEQUE' && (
-            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 mb-1">
-                    Cheque Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={chequeNumber}
-                    onChange={e => setChequeNumber(e.target.value)}
-                    placeholder="e.g. 000456"
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white font-mono text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 mb-1">
-                    Cheque Date
-                  </label>
-                  <input
-                    type="date"
-                    value={chequeDate}
-                    onChange={e => setChequeDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 mb-1">
-                    Deposit Date
-                  </label>
-                  <input
-                    type="date"
-                    value={depositDate}
-                    onChange={e => setDepositDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 mb-1">
-                    Clearing Status
-                  </label>
-                  <select
-                    value={clearingStatus}
-                    onChange={e => setClearingStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white font-bold text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  >
-                    <option value="PENDING">Awaiting Clearance (Pending)</option>
-                    <option value="CLEARED">Cleared / Honored</option>
-                    <option value="BOUNCED">Bounced / Rejected</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Payment Date & Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Payment Date
-              </label>
-              <input
-                type="date"
-                required
-                value={paymentDate}
-                onChange={e => setPaymentDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Notes / Reference
-              </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. Received via GPay at shop counter"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Form Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
-            >
-              Cancel
+            <button type="button" onClick={save} disabled={busy || !!tooMuch}
+              className={`w-full h-14 rounded-2xl text-white text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-60 ${incoming ? 'bg-emerald-700' : 'bg-rose-700'}`}>
+              {busy ? <><Loader2 className="w-6 h-6 animate-spin" /> {t('saving')}</> : t('save_payment')}
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md shadow-purple-600/20 transition-all flex items-center gap-2"
-            >
-              {loading ? (
-                <span>Recording Payment...</span>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Payment & Update Dues</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+          </>
+        )}
       </div>
-    </div>
+    </Sheet>
   );
 };
-

@@ -1,0 +1,232 @@
+rules_version = '2';
+
+// YorLedger — Firestore Security Rules (Spark plan: these rules ARE the backend).
+//
+// Data model (all money in integer paise, GST in basis points):
+//   users/{uid}                          { shop_id, role:'OWNER', email }
+//   users/{uid}/notifications/{id}       in-app inbox (written by admin decisions)
+//   shops/{shopId}                       shop profile + status (PENDING|APPROVED|REJECTED)
+//   shops/{shopId}/verifications/{id}    one row per admin review round (append-only)
+//   shops/{shopId}/parties/{id}          customers / suppliers / artisans (soft delete)
+//   shops/{shopId}/bills/{id}            SALE | PURCHASE | JOB_WORK, items + tax snapshot
+//   shops/{shopId}/saleInvoices/{no}     uniqueness lock for SALE invoice numbers
+//   shops/{shopId}/payments/{id}         CASH | CHEQUE | NEFT (append-only, cheque dates editable)
+//   shops/{shopId}/utrs/{utr}            uniqueness lock for NEFT UTR numbers
+//   shops/{shopId}/returns/{id}          return events (append-only)
+//   shops/{shopId}/audit/{id}            audit log (append-only)
+//   shops/{shopId}/settings/{doc}        invoice / notification / app preferences
+//
+// Admin = Firebase custom claim `admin: true`, set once with scripts/set-admin.mjs.
+// There is no admin self-signup and no hardcoded admin email.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function shopDoc(shopId) { return get(/databases/$(database)/documents/shops/$(shopId)); }
+    function ownsShop(shopId) {
+      return signedIn() && shopDoc(shopId).data.owner_uid == request.auth.uid;
+    }
+    // Approval gate: business data is reachable only once the admin approved the shop.
+    function approvedOwner(shopId) {
+      return ownsShop(shopId) && shopDoc(shopId).data.status == 'APPROVED';
+    }
+    function unchanged(keys) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function isPaise(v) { return v is int && v >= 0; }
+    function billPath(shopId, billId) {
+      return /databases/$(database)/documents/shops/$(shopId)/bills/$(billId);
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Created once, together with the shop, during registration.
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'OWNER'
+        && request.resource.data.keys().hasOnly(['shop_id', 'role', 'email', 'created_at'])
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.shop_id)).data.owner_uid == uid;
+      allow update, delete: if false;
+
+      match /notifications/{id} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if isAdmin();
+        // Owner may only mark as read.
+        allow update: if signedIn() && request.auth.uid == uid && onlyChanges(['read_at']);
+        allow delete: if false;
+      }
+    }
+
+    // ---------- shops ----------
+    match /shops/{shopId} {
+      allow get: if ownsShop(shopId) || isAdmin();
+      allow list: if isAdmin(); // admin review queue
+
+      allow create: if signedIn()
+        && request.resource.data.owner_uid == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && request.resource.data.default_gst_bp is int
+        && request.resource.data.gstin is string && request.resource.data.gstin.size() == 15
+        && !('verified_at' in request.resource.data)
+        && !('verified_by' in request.resource.data);
+
+      allow update: if
+        // Admin decision: only status + verification fields.
+        (isAdmin() && onlyChanges(['status', 'verified_at', 'verified_by', 'rejection_reason', 'updated_at'])
+          && request.resource.data.status in ['APPROVED', 'REJECTED'])
+        // Rejected owner corrects details and resubmits -> back to PENDING.
+        || (ownsShop(shopId) && resource.data.status == 'REJECTED'
+          && request.resource.data.status == 'PENDING'
+          && unchanged(['owner_uid', 'verified_at', 'verified_by']))
+        // Approved owner edits non-identity settings. GSTIN / legal name changes need re-review.
+        || (approvedOwner(shopId)
+          && unchanged(['owner_uid', 'status', 'verified_at', 'verified_by', 'gstin', 'name', 'state_code'])
+          && request.resource.data.default_gst_bp is int
+          && request.resource.data.default_gst_bp >= 0 && request.resource.data.default_gst_bp <= 2800);
+      allow delete: if false;
+
+      // Verification document (compressed JPEG data URL). Private: owner + admin only.
+      match /private/{docId} {
+        allow read: if ownsShop(shopId) || isAdmin();
+        allow write: if ownsShop(shopId) && docId == 'document'
+          && shopDoc(shopId).data.status != 'APPROVED'
+          && request.resource.data.data_url is string
+          && request.resource.data.data_url.size() < 900000;
+      }
+
+      match /verifications/{id} {
+        allow read: if ownsShop(shopId) || isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+
+      // ---------- parties ----------
+      match /parties/{partyId} {
+        allow read: if approvedOwner(shopId);
+        allow create: if approvedOwner(shopId)
+          && request.resource.data.type in ['CUSTOMER', 'SUPPLIER', 'ARTISAN']
+          && request.resource.data.name is string && request.resource.data.name.size() > 0
+          && request.resource.data.phone is string;
+        allow update: if approvedOwner(shopId)
+          && request.resource.data.type in ['CUSTOMER', 'SUPPLIER', 'ARTISAN'];
+        allow delete: if false; // soft delete via deleted_at
+      }
+
+      // ---------- bills ----------
+      match /bills/{billId} {
+        allow read: if approvedOwner(shopId);
+
+        allow create: if approvedOwner(shopId)
+          && request.resource.data.kind in ['SALE', 'PURCHASE', 'JOB_WORK']
+          && request.resource.data.invoice_no is int && request.resource.data.invoice_no > 0
+          && request.resource.data.tax_mode in ['INTRA', 'INTER']
+          && request.resource.data.gst_bp is int
+          && isPaise(request.resource.data.subtotal)
+          && isPaise(request.resource.data.cgst) && isPaise(request.resource.data.sgst) && isPaise(request.resource.data.igst)
+          && request.resource.data.grand_total == request.resource.data.subtotal
+               + request.resource.data.cgst + request.resource.data.sgst + request.resource.data.igst
+          && (request.resource.data.tax_mode == 'INTRA' ? request.resource.data.igst == 0
+               : (request.resource.data.cgst == 0 && request.resource.data.sgst == 0))
+          && request.resource.data.items is list && request.resource.data.items.size() > 0
+          && request.resource.data.paid_total == 0
+          && request.resource.data.returned_total == 0
+          && request.resource.data.amount_due == request.resource.data.grand_total
+          && request.resource.data.status == 'PENDING'
+          // SALE invoice numbers are unique per shop: the lock doc must be created in the same write.
+          && (request.resource.data.kind != 'SALE' ||
+              (!exists(/databases/$(database)/documents/shops/$(shopId)/saleInvoices/$(string(request.resource.data.invoice_no)))
+               && getAfter(/databases/$(database)/documents/shops/$(shopId)/saleInvoices/$(string(request.resource.data.invoice_no))).data.bill_id == billId));
+
+        // The tax snapshot and items are immutable. Totals may only move through a
+        // payment or return created in the same write (referenced by last_op).
+        allow update: if approvedOwner(shopId)
+          && unchanged(['kind', 'party_id', 'invoice_no', 'bill_date', 'gst_bp', 'tax_mode', 'items',
+                        'subtotal', 'cgst', 'sgst', 'igst', 'grand_total', 'created_at'])
+          && request.resource.data.amount_due == request.resource.data.grand_total
+               - request.resource.data.paid_total - request.resource.data.returned_total
+          && request.resource.data.status == (request.resource.data.amount_due <= 0 ? 'SETTLED' : 'PENDING')
+          && (
+            // payment
+            (onlyChanges(['paid_total', 'amount_due', 'status', 'last_op', 'updated_at'])
+              && request.resource.data.amount_due >= 0
+              && getAfter(/databases/$(database)/documents/shops/$(shopId)/payments/$(request.resource.data.last_op)).data.bill_id == billId
+              && request.resource.data.paid_total == resource.data.paid_total
+                   + getAfter(/databases/$(database)/documents/shops/$(shopId)/payments/$(request.resource.data.last_op)).data.amount)
+            // return (amount_due may go below zero = party credit; never auto-refunded)
+            || (onlyChanges(['returned_total', 'returned_qty', 'amount_due', 'status', 'last_op', 'updated_at'])
+              && getAfter(/databases/$(database)/documents/shops/$(shopId)/returns/$(request.resource.data.last_op)).data.bill_id == billId
+              && request.resource.data.returned_total == resource.data.returned_total
+                   + getAfter(/databases/$(database)/documents/shops/$(shopId)/returns/$(request.resource.data.last_op)).data.total_reduction)
+            // reminder date / notes
+            || onlyChanges(['remind_on', 'remind_lead_days', 'notes', 'updated_at'])
+            // soft delete only when no money has moved
+            || (onlyChanges(['deleted_at', 'updated_at'])
+              && resource.data.paid_total == 0 && resource.data.returned_total == 0)
+          );
+        allow delete: if false;
+      }
+
+      match /saleInvoices/{invoiceNo} {
+        allow read: if approvedOwner(shopId);
+        allow create: if approvedOwner(shopId)
+          && getAfter(billPath(shopId, request.resource.data.bill_id)).data.invoice_no == int(invoiceNo);
+        allow update, delete: if false;
+      }
+
+      // ---------- payments ----------
+      match /payments/{paymentId} {
+        allow read: if approvedOwner(shopId);
+        allow create: if approvedOwner(shopId)
+          && request.resource.data.amount is int && request.resource.data.amount > 0
+          && request.resource.data.mode in ['CASH', 'CHEQUE', 'NEFT']
+          && (request.resource.data.mode != 'CASH' || request.resource.data.collected_by is string)
+          && (request.resource.data.mode != 'CHEQUE' || request.resource.data.cheque_date is string)
+          && (request.resource.data.mode != 'NEFT' ||
+              (request.resource.data.utr_no is string && request.resource.data.txn_date is string
+               && !exists(/databases/$(database)/documents/shops/$(shopId)/utrs/$(request.resource.data.utr_no))
+               && existsAfter(/databases/$(database)/documents/shops/$(shopId)/utrs/$(request.resource.data.utr_no))))
+          && getAfter(billPath(shopId, request.resource.data.bill_id)).data.last_op == paymentId;
+        // Cheque deposit / clearing dates are filled in later.
+        allow update: if approvedOwner(shopId) && resource.data.mode == 'CHEQUE'
+          && onlyChanges(['deposit_date', 'clearing_date', 'clearing_status', 'updated_at']);
+        allow delete: if false;
+      }
+
+      match /utrs/{utr} {
+        allow read: if approvedOwner(shopId);
+        allow create: if approvedOwner(shopId);
+        allow update, delete: if false;
+      }
+
+      // ---------- returns ----------
+      match /returns/{returnId} {
+        allow read: if approvedOwner(shopId);
+        allow create: if approvedOwner(shopId)
+          && isPaise(request.resource.data.total_reduction) && request.resource.data.total_reduction > 0
+          && request.resource.data.items is list && request.resource.data.items.size() > 0
+          && getAfter(billPath(shopId, request.resource.data.bill_id)).data.last_op == returnId;
+        allow update, delete: if false;
+      }
+
+      // ---------- audit ----------
+      match /audit/{id} {
+        allow read: if approvedOwner(shopId) || isAdmin();
+        allow create: if (approvedOwner(shopId) || isAdmin())
+          && request.resource.data.actor_uid == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      // ---------- settings ----------
+      match /settings/{docId} {
+        allow read: if approvedOwner(shopId);
+        allow write: if approvedOwner(shopId) && docId in ['invoice', 'notifications', 'preferences'];
+      }
+    }
+  }
+}
