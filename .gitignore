@@ -14,3 +14,4 @@ Thumbs.db
 HLD_LLD_extracted.txt
 extract_docx.ps1
 docx_unpacked/
+.firebase/

@@ -156,3 +156,4 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, loading = f
     </div>
   );
 };
+

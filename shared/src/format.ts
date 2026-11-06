@@ -27,3 +27,4 @@ export function formatINR(amountInRupees: number, includeDecimals = false): stri
 export function formatPaiseToINR(paise: number, includeDecimals = false): string {
   return formatINR(paise / 100, includeDecimals);
 }
+

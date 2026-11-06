@@ -300,3 +300,4 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ charts, loadin
     </div>
   );
 };
+

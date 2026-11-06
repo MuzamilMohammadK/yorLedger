@@ -156,4 +156,68 @@ describe('Phase 2: SB&A Silk Ledger Dashboard & Analytics Integration', () => {
     const body = await res.json() as any;
     assert.strictEqual(body.shop.id, shop2Result.shop.id);
   });
+
+  it('GET /api/v1/ledger/transactions returns filtered transactions and accurate ledger summary', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/ledger/transactions`, {
+      headers: {
+        'Authorization': 'Bearer dev-owner-ramesh@srilakshmisilks.com'
+      }
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as any;
+    assert.ok(Array.isArray(body.transactions));
+    assert.ok(body.summary);
+    assert.ok(typeof body.summary.total_receivable === 'number');
+    assert.ok(typeof body.summary.total_payable === 'number');
+    assert.ok(typeof body.summary.total_transactions === 'number');
+    assert.strictEqual(body.summary.total_transactions, body.transactions.length);
+
+    // Filter by type = SALE
+    const saleRes = await fetch(`${baseUrl}/api/v1/ledger/transactions?type=SALE`, {
+      headers: {
+        'Authorization': 'Bearer dev-owner-ramesh@srilakshmisilks.com'
+      }
+    });
+    assert.strictEqual(saleRes.status, 200);
+    const saleBody = await saleRes.json() as any;
+    assert.ok(saleBody.transactions.every((t: any) => t.type === 'SALE'));
+  });
+
+  it('POST /api/v1/ledger/transactions creates a valid transaction with tax split', async () => {
+    // 1. Get parties to find a party ID
+    const partiesRes = await fetch(`${baseUrl}/api/v1/parties`, {
+      headers: {
+        'Authorization': 'Bearer dev-owner-ramesh@srilakshmisilks.com'
+      }
+    });
+    const partiesBody = await partiesRes.json() as any;
+    const testParty = partiesBody.parties[0];
+
+    // 2. Post a new transaction
+    const postRes = await fetch(`${baseUrl}/api/v1/ledger/transactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer dev-owner-ramesh@srilakshmisilks.com'
+      },
+      body: JSON.stringify({
+        party_id: testParty.id,
+        type: 'SALE',
+        amount_rupees: 50000,
+        paid_rupees: 20000,
+        item_name: 'Pure Kanchipuram Silk Bridal Saree',
+        notes: 'Wedding bulk order discount'
+      })
+    });
+
+    assert.strictEqual(postRes.status, 201);
+    const postBody = await postRes.json() as any;
+    assert.ok(postBody.transaction.id);
+    assert.strictEqual(postBody.transaction.grand_total_paise, 5000000);
+    assert.strictEqual(postBody.transaction.paid_paise, 2000000);
+    assert.strictEqual(postBody.transaction.pending_paise, 3000000);
+    assert.strictEqual(postBody.transaction.status, 'PARTIAL');
+    assert.strictEqual(postBody.transaction.party_name, testParty.name);
+  });
 });

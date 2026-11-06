@@ -1,4 +1,4 @@
-import { getStateByCode } from './states.js';
+import { getStateByCode, INDIAN_STATES } from './states.js';
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const GST_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -116,3 +116,22 @@ export function normalizeInvoice(raw: string): number | null {
   const num = parseInt(stripped, 10);
   return isNaN(num) || num <= 0 ? null : num;
 }
+
+/**
+ * Validates Indian 6-digit postal PIN Code format (110001 - 899999).
+ */
+export function validatePinCode(pin: string): boolean {
+  if (!pin) return false;
+  return /^[1-9][0-9]{5}$/.test(pin.trim());
+}
+
+/**
+ * Helper to lookup state code by exact or case-insensitive state name.
+ */
+export function getStateCodeByName(stateName: string): string | undefined {
+  if (!stateName) return undefined;
+  const target = stateName.trim().toLowerCase();
+  const match = INDIAN_STATES.find(s => s.name.toLowerCase() === target);
+  return match?.code;
+}
+

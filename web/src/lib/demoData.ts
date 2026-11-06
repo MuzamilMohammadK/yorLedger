@@ -10,9 +10,13 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'Meenakshi Sundaram',
       gstin: '36AAACM8401P1Z3',
       phone: '9849011223',
+      additional_phones: ['9849011224', '9849099881'],
       alt_phone: '9849011224',
-      address: 'Shop 12, Sultan Bazaar, Koti, Hyderabad, Telangana',
+      address: 'Shop 12, Sultan Bazaar, Koti',
+      state: 'Telangana',
       state_code: '36',
+      pin_code: '500095',
+      notes: 'Premier bridal saree showroom in Sultan Bazaar with regular monthly bulk orders.',
       created_at: new Date(Date.now() - 90 * 86400000).toISOString()
     },
     {
@@ -23,8 +27,12 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'Ananya Hegde',
       gstin: '29AAAAA0000A1Z5',
       phone: '9880123456',
-      address: 'Commercial Street, Bangalore, Karnataka',
+      additional_phones: ['9880123457'],
+      address: 'Commercial Street, Tasker Town',
+      state: 'Karnataka',
       state_code: '29',
+      pin_code: '560001',
+      notes: 'High-end pure silk retailer catering to central Bangalore wedding market.',
       created_at: new Date(Date.now() - 75 * 86400000).toISOString()
     },
     {
@@ -35,8 +43,12 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'S. Rajagopalan',
       gstin: '33AAACK4019Q1ZP',
       phone: '9444055667',
-      address: 'T. Nagar, Chennai, Tamil Nadu',
+      additional_phones: [],
+      address: 'Panagal Park, T. Nagar',
+      state: 'Tamil Nadu',
       state_code: '33',
+      pin_code: '600017',
+      notes: 'Famous South Indian silk emporium. Requires 15-day credit cycle.',
       created_at: new Date(Date.now() - 60 * 86400000).toISOString()
     },
     {
@@ -47,8 +59,12 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'Virendra Shah',
       gstin: '27AAACV9012R1ZN',
       phone: '9820011223',
-      address: 'Dadar Market, Mumbai, Maharashtra',
+      additional_phones: ['9820099882'],
+      address: 'Dadar Flower Market Road, Dadar West',
+      state: 'Maharashtra',
       state_code: '27',
+      pin_code: '400028',
+      notes: 'Bulk distributor for North and West Indian bridal saree boutiques.',
       created_at: new Date(Date.now() - 50 * 86400000).toISOString()
     },
     {
@@ -59,8 +75,12 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'K. Murugan',
       gstin: '29AAACM1234P1Z2',
       phone: '9448099881',
-      address: 'Silk Cocoon Market Road, Ramanagara, Karnataka',
+      additional_phones: ['9448099882'],
+      address: 'Silk Cocoon Market Road, Reeling Center',
+      state: 'Karnataka',
       state_code: '29',
+      pin_code: '562159',
+      notes: 'Direct filature source for Grade-A Mulberry silk cocoons and twisted raw yarn.',
       created_at: new Date(Date.now() - 100 * 86400000).toISOString()
     },
     {
@@ -71,8 +91,12 @@ export function createSeedParties(shopId: string): Party[] {
       owner_name: 'Girish Patel',
       gstin: '24AAACS5678Q1Z1',
       phone: '9825044332',
-      address: 'Ring Road Textile Market, Surat, Gujarat',
+      additional_phones: [],
+      address: 'Ring Road Textile Market, Salabatpura',
+      state: 'Gujarat',
       state_code: '24',
+      pin_code: '395002',
+      notes: 'Manufacturer of certified silver and real gold testing zari threads.',
       created_at: new Date(Date.now() - 80 * 86400000).toISOString()
     },
     {
@@ -82,8 +106,12 @@ export function createSeedParties(shopId: string): Party[] {
       type: 'ARTISAN',
       owner_name: 'Shankarappa',
       phone: '9440188776',
-      address: 'Weavers Colony, Dharmavaram, Andhra Pradesh',
+      additional_phones: [],
+      address: 'Weavers Colony, 3rd Cross',
+      state: 'Andhra Pradesh',
       state_code: '37',
+      pin_code: '515671',
+      notes: 'Master weaver specializing in traditional Dharmavaram jacquard contrast pallu and korvai borders.',
       created_at: new Date(Date.now() - 70 * 86400000).toISOString()
     },
     {
@@ -93,8 +121,12 @@ export function createSeedParties(shopId: string): Party[] {
       type: 'ARTISAN',
       owner_name: 'Narayana Swamy',
       phone: '9848033221',
-      address: 'Pochampally Weaving Park, Telangana',
+      additional_phones: ['9848033222'],
+      address: 'Pochampally Weaving Park',
+      state: 'Telangana',
       state_code: '36',
+      pin_code: '508284',
+      notes: 'Expert ikat and double-ikat tie-and-dye weaving specialist on handloom frames.',
       created_at: new Date(Date.now() - 40 * 86400000).toISOString()
     }
   ];
@@ -562,3 +594,4 @@ export function calculateCharts(transactions: Transaction[], period: DateRangeOp
     }
   };
 }
+

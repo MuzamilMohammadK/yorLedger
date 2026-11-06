@@ -348,3 +348,4 @@ export const RecentTransactionsTable: React.FC<RecentTransactionsTableProps> = (
     </div>
   );
 };
+

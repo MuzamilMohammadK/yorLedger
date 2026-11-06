@@ -56,3 +56,4 @@ analyticsRouter.get('/charts', async (req: Request, res: Response): Promise<void
     res.status(500).json({ code: 'SERVER_ERROR', message: err.message || 'Failed to fetch charts' });
   }
 });
+

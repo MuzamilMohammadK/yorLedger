@@ -4,6 +4,12 @@ import { authRouter } from './routes/auth.js';
 import { adminRouter } from './routes/admin.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { ledgerRouter } from './routes/ledger.js';
+import { partiesRouter } from './routes/parties.js';
+import { historyRouter } from './routes/history.js';
+import { duesRouter } from './routes/dues.js';
+import { paymentsRouter } from './routes/payments.js';
+import { reportsRouter } from './routes/reports.js';
+import { settingsRouter } from './routes/settings.js';
 import { initializeFirebaseAdmin, requireAuth, requireApprovedShop } from './middleware/auth.js';
 
 export function createApp(): Express {
@@ -26,16 +32,12 @@ export function createApp(): Express {
   app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/analytics', analyticsRouter);
   app.use('/api/v1/ledger', ledgerRouter);
-
-  // Protected Business Routes - Strictly requires APPROVED shop status
-  const protectedShopRouter = express.Router();
-  protectedShopRouter.use(requireAuth, requireApprovedShop);
-  protectedShopRouter.get('/overview', (req: Request, res: Response) => {
-    res.json({ message: 'Approved merchant access verified', shop: req.shop });
-  });
-  app.use('/api/v1/parties', protectedShopRouter);
-  app.use('/api/v1/dues', protectedShopRouter);
-  app.use('/api/v1/dashboard-data', protectedShopRouter);
+  app.use('/api/v1/parties', partiesRouter);
+  app.use('/api/v1/history', historyRouter);
+  app.use('/api/v1/dues', duesRouter);
+  app.use('/api/v1/payments', paymentsRouter);
+  app.use('/api/v1/reports', reportsRouter);
+  app.use('/api/v1/settings', settingsRouter);
 
   // Global 404 handler
   app.use((_req: Request, res: Response) => {

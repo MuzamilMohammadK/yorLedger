@@ -71,3 +71,4 @@ CREATE INDEX IF NOT EXISTS idx_transactions_shop_date ON transactions(shop_id, i
 CREATE INDEX IF NOT EXISTS idx_transactions_shop_status ON transactions(shop_id, status);
 CREATE INDEX IF NOT EXISTS idx_transactions_shop_type ON transactions(shop_id, type);
 CREATE INDEX IF NOT EXISTS idx_payments_shop_tx ON payments(shop_id, transaction_id);
+

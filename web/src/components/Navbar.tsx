@@ -16,6 +16,7 @@ export const Navbar: React.FC = () => {
     '/history',
     '/dues',
     '/analytics',
+    '/reports',
     '/settings'
   ].some(p => location.pathname === p || location.pathname.startsWith(`${p}/`));
 
