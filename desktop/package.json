@@ -19,11 +19,59 @@
     "appId": "com.yorledger.app",
     "productName": "YorLedger",
     "artifactName": "YorLedger-${version}-${os}-${arch}.${ext}",
-    "directories": { "output": "release", "buildResources": "build" },
-    "files": ["main.cjs", "preload.cjs", "app/**/*", "package.json"],
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.ico" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true },
-    "mac": { "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }], "icon": "build/icon.png", "category": "public.app-category.finance" },
-    "linux": { "target": ["AppImage", "deb"], "icon": "build/icon.png", "category": "Office", "maintainer": "YorLedger" }
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "app/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office",
+      "maintainer": "YorLedger"
+    },
+    "publish": null
+  },
+  "homepage": "https://github.com/MuzamilMohammadK/yorLedger",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MuzamilMohammadK/yorLedger.git"
   }
 }
