@@ -109,6 +109,7 @@ export interface Party {
   state_code: string;
   pin_code: string;
   notes?: string | null;
+  joined_on?: string; // YYYY-MM-DD (IST) — date the party was added (§7.2 calendar)
   current_balance?: number; // Outstanding amount in Rupees
   balance_type?: 'RECEIVABLE' | 'PAYABLE' | 'SETTLED';
   created_at: string;

@@ -140,6 +140,7 @@ class ShopCache {
       state_code: p.state_code ?? '',
       pin_code: p.pin_code ?? '',
       notes: p.notes ?? null,
+      joined_on: p.joined_on ?? (toIso(p.created_at) ?? '').slice(0, 10),
       created_at: toIso(p.created_at) ?? p.joined_on ?? new Date().toISOString(),
       updated_at: toIso(p.updated_at) ?? undefined
     };

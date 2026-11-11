@@ -98,10 +98,16 @@ export async function updateParty(shopId: string, partyId: string, payload: Upda
   return cache.parties().find(p => p.id === partyId)!;
 }
 
-/** Soft delete (spec §7.5): only when the party has no open dues and no bills. */
+/**
+ * Soft delete (§7.5): allowed only when no bill of this party has money open
+ * (amount due > 0, or a credit < 0). Financial history is never deleted: bills keep
+ * the party name and stay in History and reports.
+ */
 export async function deleteParty(shopId: string, partyId: string) {
-  const bills = cache.rawBills().filter(b => b.party_id === partyId);
-  if (bills.length) throw new AppError('This party has bills. It cannot be removed.', 'PARTY_HAS_BILLS', undefined, 409);
+  const open = cache.rawBills().filter(b => b.party_id === partyId && b.amount_due !== 0);
+  if (open.length) {
+    throw new AppError('This party still has money pending or a credit. Settle it first.', 'PARTY_HAS_OPEN_DUES', undefined, 409);
+  }
   const batch = writeBatch(db);
   batch.update(ref(shopId, 'parties', partyId), { deleted_at: serverTimestamp(), updated_at: serverTimestamp() });
   audit(batch, shopId, 'party', partyId, 'DELETE', null, null);
