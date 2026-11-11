@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, Share2, Loader2 } from 'lucide-react';
+import { formatPaiseToINR } from '@yorbalance/shared';
+import { useAuth } from '../context/AuthContext';
+import { shareBillsPdf } from '../lib/pdf';
+import { Sheet } from '../components/ui/Sheet';
 import { useI18n } from '../i18n';
 import { api } from '../lib/api';
 import { useLive } from '../lib/useLiveData';
@@ -27,6 +31,10 @@ export const HistoryPage: React.FC = () => {
   const [maxAmt, setMaxAmt] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [shown, setShown] = useState(PAGE);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [sharing, setSharing] = useState(false);
+  const { shop } = useAuth();
   const openId = params.get('bill');
 
   const { data: partyData } = useLive(() => api.getParties(), []);
@@ -62,6 +70,21 @@ export const HistoryPage: React.FC = () => {
     }
     return out;
   }, [page, t, fmtDate]);
+
+  // §14.7 share one, many or all bills (of the current filter) as one PDF.
+  const shareable = rows.filter(r => r.item_kind === 'TRANSACTION');
+  const doShare = async () => {
+    if (!shop || !picked.size) return;
+    setSharing(true);
+    try {
+      const bills = await Promise.all([...picked].map(id => api.getHistoryDetails(id).then(r => r.transaction)));
+      bills.sort((a, b) => a.invoice_date.localeCompare(b.invoice_date));
+      await shareBillsPdf(shop, bills);
+      setShareOpen(false);
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const open = (r: TxRow) => {
     const next = new URLSearchParams(params);
@@ -118,7 +141,17 @@ export const HistoryPage: React.FC = () => {
         </div>
       )}
 
-      {data && <p className="text-base text-slate-600">{t('results_count', { n: rows.length })}</p>}
+      {data && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-base text-slate-600">{t('results_count', { n: rows.length })}</p>
+          {!!shareable.length && (
+            <button onClick={() => { setPicked(new Set()); setShareOpen(true); }}
+              className="h-11 px-4 rounded-xl border-2 border-slate-200 bg-white text-base font-semibold flex items-center gap-2">
+              <Share2 className="w-5 h-5" /> {t('share_bills')}
+            </button>
+          )}
+        </div>
+      )}
       {data === null && <p className="py-8 text-center text-base text-slate-500">{t('loading')}</p>}
       {data && !rows.length && <p className="py-10 text-center text-lg text-slate-500">{t('no_bills')}</p>}
 
@@ -141,6 +174,36 @@ export const HistoryPage: React.FC = () => {
       )}
 
       {openBill && <BillDetailsSheet bill={openBill} onClose={close} />}
+
+      {shareOpen && (
+        <Sheet title={t('share_bills')} onClose={() => setShareOpen(false)}>
+          <div className="p-4 space-y-3">
+            <p className="text-base text-slate-600">{t('choose_bills')}</p>
+            <label className="flex items-center gap-3 min-h-12 px-2 rounded-xl bg-slate-50 cursor-pointer">
+              <input type="checkbox" className="w-6 h-6 accent-indigo-700" checked={picked.size === shareable.length}
+                onChange={e => setPicked(e.target.checked ? new Set(shareable.map(r => r.id)) : new Set())} />
+              <span className="text-base font-semibold">{t('select_all')} ({shareable.length})</span>
+            </label>
+            <div className="max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
+              {shareable.map(r => (
+                <label key={r.id} className="flex items-center gap-3 min-h-12 px-2 py-2 cursor-pointer">
+                  <input type="checkbox" className="w-6 h-6 accent-indigo-700" checked={picked.has(r.id)}
+                    onChange={e => { const n = new Set(picked); if (e.target.checked) n.add(r.id); else n.delete(r.id); setPicked(n); }} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-base font-semibold truncate">{r.party_name}</span>
+                    <span className="block text-sm text-slate-500">{t(`kind_${r.type}` as any)} · #{r.invoice_number} · {fmtDate(r.invoice_date)}</span>
+                  </span>
+                  <span className="text-base font-semibold">{formatPaiseToINR(r.grand_total_paise, true)}</span>
+                </label>
+              ))}
+            </div>
+            <button onClick={doShare} disabled={!picked.size || sharing}
+              className="w-full h-14 rounded-2xl bg-indigo-700 text-white text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+              {sharing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Share2 className="w-6 h-6" />} {t('share_selected', { n: picked.size })}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 };

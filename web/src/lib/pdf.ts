@@ -1,6 +1,6 @@
 // Bill PDF, generated on the device (no server). Standard PDF fonts have no
 // rupee glyph, so amounts print as "Rs." to stay readable everywhere.
-import type { Shop, Transaction } from '@yorbalance/shared';
+import type { InvoiceSettings, Shop, Transaction } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { isAndroidApp, isDesktopApp, shareFile } from './platform';
 import { api } from './api';
@@ -20,15 +20,31 @@ function money(paise: number): string {
 
 const INVOICE_DATE_FORMATS = ['DD/MM/YYYY', 'DD-MMM-YYYY', 'YYYY-MM-DD'] as const;
 
+type Inv = InvoiceSettings | undefined;
+
 export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob> {
+  return buildBillsPdf(shop, [bill]);
+}
+
+/** §14.7 one, many or all bills in a single PDF (one bill per page). */
+export async function buildBillsPdf(shop: Shop, bills: Transaction[]): Promise<Blob> {
   const { jsPDF } = await import('jspdf');
-  // §12.5 invoice settings: prefix, date format, logo, GSTIN, tax breakdown, footer, terms.
   const inv = (await api.getShopSettings().catch(() => null))?.invoice_settings;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  bills.forEach((b, i) => {
+    if (i) doc.addPage();
+    drawBill(doc, shop, b, inv);
+  });
+  return doc.output('blob');
+}
+
+function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
+  doc.setTextColor(0);
+  // §12.5 invoice settings: prefix, date format, logo, GSTIN, tax breakdown, footer, terms.
   const fmt = INVOICE_DATE_FORMATS.includes(inv?.date_format as any) ? (inv!.date_format as typeof INVOICE_DATE_FORMATS[number]) : 'DD/MM/YYYY';
   const dmy = (iso: string) => formatDate(iso, fmt);
   const showGstin = inv?.show_gstin ?? true;
   const billNo = `${inv?.invoice_prefix ?? ''}${bill.invoice_number}`;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, L = 14, R = W - 14;
   const party = cache.rawParty(bill.party_id);
   let y = 16;
@@ -120,7 +136,6 @@ export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob>
   }
   doc.setFontSize(8).setTextColor(120);
   doc.text('Computer generated bill. Made with YorLedger.', W / 2, 288, { align: 'center' });
-  return doc.output('blob');
 }
 
 export async function shareBillPdf(shop: Shop, bill: Transaction) {
@@ -145,4 +160,11 @@ export async function openBillPdf(shop: Shop, bill: Transaction) {
 export async function billPdfUrl(shop: Shop, bill: Transaction): Promise<string | null> {
   if (isAndroidApp) return null;
   return URL.createObjectURL(await buildBillPdf(shop, bill));
+}
+
+/** Share / save several bills as one PDF. */
+export async function shareBillsPdf(shop: Shop, bills: Transaction[]) {
+  const blob = await buildBillsPdf(shop, bills);
+  const date = new Date().toISOString().slice(0, 10);
+  await shareFile(blob, `YorLedger-${bills.length}-bills-${date}.pdf`, `${bills.length} bills`);
 }

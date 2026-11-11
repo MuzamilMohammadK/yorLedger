@@ -38,7 +38,7 @@ jobs:
       - run: npm ci
       - run: npm run build --workspace=shared
       - name: Firestore security rules tests
-        run: npx --yes $FIREBASE_TOOLS emulators:exec --only firestore --project demo-yorledger "node --test tests/rules/"
+        run: npx --yes $FIREBASE_TOOLS emulators:exec --only firestore --project demo-yorledger "node --test tests/rules/rules.test.mjs"
       - name: Build web app against the emulators
         env:
           VITE_USE_EMULATORS: 'true'
