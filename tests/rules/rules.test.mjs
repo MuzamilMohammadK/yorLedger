@@ -92,8 +92,9 @@ test('registration creates a PENDING shop + user together; cannot self-approve',
   ok.set(db.doc('adminNotifications/n1'), { kind: 'SHOP_REGISTERED', shop_id: 'sN', shop_name: 'N', owner_uid: uid, read_at: null, created_at: now });
   await assertSucceeds(ok.commit());
 
-  const bad = as('other').batch();
-  bad.set(as('other').doc('shops/sX'), shop('other', 'APPROVED'));
+  const other = as('other');
+  const bad = other.batch();
+  bad.set(other.doc('shops/sX'), shop('other', 'APPROVED'));
   await assertFails(bad.commit());
 });
 
