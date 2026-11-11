@@ -103,7 +103,7 @@ export const PartiesPage: React.FC = () => {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-slate-900">{t('nav_parties')}</h1>
         <div className="flex gap-2">
-          <button onClick={() => setShowCal(!showCal)} aria-pressed={showCal}
+          <button onClick={() => setShowCal(!showCal)} aria-pressed={showCal} aria-label={t('join_calendar')}
             className={`h-12 px-3 rounded-xl border-2 text-base font-semibold flex items-center gap-2 ${showCal ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white'}`}>
             <CalendarDays className="w-5 h-5" /> <span className="hidden sm:inline">{t('join_calendar')}</span>
           </button>

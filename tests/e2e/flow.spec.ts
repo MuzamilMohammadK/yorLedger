@@ -18,6 +18,9 @@ async function snap(page: Page, name: string) {
   await page.screenshot({ path: `${dir}${String(shot).padStart(2, '0')}-${name}.png`, fullPage: true });
 }
 
+/** First visible match (phone cards and desktop tables both exist in the page). */
+const vis = (l: Locator) => l.filter({ visible: true }).first();
+
 /** The visible pane of the Ledger pager (all three panes stay mounted). */
 const pane = (page: Page): Locator => page.locator('[role="tabpanel"][aria-hidden="false"]');
 
@@ -102,7 +105,7 @@ test('complete shop journey', async ({ browser }, info) => {
     await addParty('Supplier', 'Dharmavaram Weavers Co', '9848011111', gstin('37AABCD1234E1Z')); // same state
     await addParty('Weaver', 'Lakshmamma Looms', '9848022222');
     await owner.goto('/#/parties');
-    await expect(owner.getByText('Kanchi Retail').first()).toBeVisible();
+    await expect(vis(owner.getByText('Kanchi Retail'))).toBeVisible();
     await snap(owner, 'parties');
     await owner.getByRole('button', { name: /Join dates/ }).click();
     await snap(owner, 'parties-calendar');
@@ -141,13 +144,13 @@ test('complete shop journey', async ({ browser }, info) => {
 
   await test.step('7. history', async () => {
     await owner.goto('/#/history');
-    await expect(owner.getByText('Kanchi Retail').first()).toBeVisible();
+    await expect(vis(owner.getByText('Kanchi Retail'))).toBeVisible();
     await snap(owner, 'history');
   });
 
   const openBill = async (party: string) => {
     await owner.goto('/#/history');
-    await owner.getByText(party).first().click();
+    await vis(owner.getByText(party)).click();
     await expect(owner.getByRole('dialog')).toBeVisible();
   };
 
@@ -198,7 +201,7 @@ test('complete shop journey', async ({ browser }, info) => {
   await test.step('12. dues', async () => {
     await owner.goto('/#/dues');
     // Sale 1,31,250 − return 26,250 − paid 50,000 = 55,000 to collect.
-    await expect(owner.getByText('₹55,000.00').first()).toBeVisible();
+    await expect(vis(owner.getByText('₹55,000.00'))).toBeVisible();
     await snap(owner, 'dues');
     await owner.getByRole('tab', { name: 'Completed' }).click();
     await snap(owner, 'dues-completed');
@@ -213,7 +216,7 @@ test('complete shop journey', async ({ browser }, info) => {
       await owner.waitForTimeout(800);
       await snap(owner, `report-${r}`);
     }
-    await expect(owner.getByText(/Net GST payable/i).first()).toBeVisible();
+    await expect(vis(owner.getByText(/Net GST payable/i))).toBeVisible();
   });
 
   await test.step('14. notifications', async () => {
