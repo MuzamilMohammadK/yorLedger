@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Phone, MessageCircle, Plus, UserPlus, Pencil, BookOpen, Trash2, CalendarDays } from 'lucide-react';
 import { Party, formatPaiseToINR, getStateByCode } from '@yorbalance/shared';
@@ -66,10 +66,13 @@ export const PartiesPage: React.FC = () => {
 
   const viewing = parties.find(p => p.id === viewingId) ?? null;
   const openParty = (p: Party) => { setConfirmDel(false); setDelError(null); setParams({ party: p.id }); };
-  // Remove only the "new" flag, so a party opened by onSuccess stays open.
+  // After saving a new party the form calls onSuccess (opens the party) and then onClose.
+  // Both run in the same tick, so onClose must not overwrite the party that was just opened.
+  const justOpened = useRef(false);
   const closeForm = () => {
     setEditing(null);
-    setParams(prev => { const n = new URLSearchParams(prev); n.delete('new'); return n; });
+    if (justOpened.current) { justOpened.current = false; return; }
+    if (params.get('new')) setParams({});
   };
 
   const balance = (p: Party) => {
@@ -219,7 +222,7 @@ export const PartiesPage: React.FC = () => {
         </Sheet>
       )}
 
-      <PartyFormModal isOpen={formOpen} onClose={closeForm} onSuccess={p => { if (!editing) openParty(p); }} initialParty={editing} />
+      <PartyFormModal isOpen={formOpen} onClose={closeForm} onSuccess={p => { if (!editing) { justOpened.current = true; openParty(p); } }} initialParty={editing} />
     </div>
   );
 };
