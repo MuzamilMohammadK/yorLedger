@@ -527,6 +527,8 @@ export interface InvoiceSettings {
   show_tax_breakdown: boolean;
   invoice_footer: string;
   terms_and_conditions: string;
+  /** Small compressed JPEG/PNG data URL printed on bills when show_logo is on. */
+  logo_data_url?: string | null;
 }
 
 export interface NotificationSettings {

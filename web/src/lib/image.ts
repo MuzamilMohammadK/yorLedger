@@ -28,3 +28,21 @@ export async function compressJpeg(file: Blob): Promise<string> {
   }
   throw new Error('This photo is too large even after compressing. Please take a smaller photo.');
 }
+
+/** Small square-ish logo for bills (≤ 256 px, ~60 KB as data URL). */
+export async function compressLogo(file: Blob): Promise<string> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 256 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  for (const q of [0.9, 0.8, 0.7, 0.6]) {
+    const url = c.toDataURL('image/jpeg', q);
+    if (url.length <= 80_000) return url;
+  }
+  throw new Error('Logo is too large. Please choose a smaller image.');
+}

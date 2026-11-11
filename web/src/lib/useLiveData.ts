@@ -62,7 +62,12 @@ export function useAlerts(approved: boolean) {
     );
   }, []);
 
-  const { data } = useLive(async () => (approved ? api.getRemindersDue() : []), [approved]);
+  // §12.6: in-app notices switch hides due reminders from the bell.
+  const { data } = useLive(async () => {
+    if (!approved) return [];
+    const n = (await api.getShopSettings().catch(() => null))?.notification_settings;
+    return (n?.in_app_notifications ?? true) && (n?.due_reminders ?? true) ? api.getRemindersDue() : [];
+  }, [approved]);
   useEffect(() => {
     setDue((data ?? []).map(b => ({ id: `due-${b.id}`, kind: 'DUE' as const, read: false, bill: b })));
   }, [data]);

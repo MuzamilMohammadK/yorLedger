@@ -17,14 +17,14 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { loginWithEmail, loginWithGoogle, user, shop } = useAuth();
-  const { t } = useI18n();
+  const { t, landing } = useI18n();
   const navigate = useNavigate();
 
   // If already logged in, redirect appropriately
   React.useEffect(() => {
     if (user) {
       if (shop?.status === 'APPROVED') {
-        navigate('/dashboard');
+        navigate(landing);
       } else {
         navigate('/pending-approval');
       }

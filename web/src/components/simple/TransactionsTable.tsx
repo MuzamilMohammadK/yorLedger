@@ -21,7 +21,7 @@ const isBill = (r: TxRow) => ['SALE', 'PURCHASE', 'JOB_WORK'].includes(r.type);
  * `detailed` adds the History columns: original amount, returns, paid, remaining.
  */
 export const TransactionsTable: React.FC<{ rows: TxRow[]; onOpen: (r: TxRow) => void; detailed?: boolean }> = ({ rows, onOpen, detailed }) => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const rs = (p?: number) => (p === undefined ? '—' : formatPaiseToINR(p, true));
   const th = 'px-3 py-3 text-left text-sm font-semibold text-slate-600 whitespace-nowrap';
   const td = 'px-3 py-3 text-base text-slate-900 whitespace-nowrap';
@@ -53,7 +53,7 @@ export const TransactionsTable: React.FC<{ rows: TxRow[]; onOpen: (r: TxRow) => 
               const st = isBill(r) ? statusOf(r) : null;
               return (
                 <tr key={`${r.item_kind ?? 'B'}-${r.id}`} className="hover:bg-slate-50 cursor-pointer" onClick={() => onOpen(r)}>
-                  <td className={td}>{r.invoice_date}</td>
+                  <td className={td}>{fmtDate(r.invoice_date)}</td>
                   <td className={`${td} font-semibold max-w-[14rem] truncate`}>{r.party_name}</td>
                   <td className={`${td} font-mono`}>{r.invoice_number}</td>
                   <td className={td}>{t(`kind_${r.type}` as any)}</td>

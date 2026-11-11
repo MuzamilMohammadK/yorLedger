@@ -22,9 +22,11 @@ import { AppError, todayIST } from './data/util';
 export { AppError as ApiError };
 
 let activeShop: Shop | null = null;
+let settingsCache: ShopSettingsData | null = null;
 
 /** Called by AuthContext whenever the session's shop changes. */
 export function setActiveShop(shop: Shop | null) {
+  if (shop?.id !== activeShop?.id) settingsCache = null;
   activeShop = shop;
   if (shop && shop.status === 'APPROVED') cache.start(shop.id);
   else cache.stop();
@@ -129,9 +131,11 @@ export const api = {
     const bill = await ledger.createBill(s, payload);
     return { message: 'Bill saved', transaction: compute.getTransactionHistoryDetails(s.id, bill.id)! };
   },
+  /** Next free SALE number: one above the highest used, or the "suggested next number" setting if higher (§12.5). */
   nextSaleInvoiceNo: async () => {
     await shopReady();
-    return ledger.nextSaleInvoiceNo();
+    const suggested = (await api.getShopSettings()).invoice_settings.suggested_next_number || 1;
+    return Math.max(ledger.nextSaleInvoiceNo(), suggested);
   },
   isSaleInvoiceFree: async (raw: string) => {
     const s = await shopReady();
@@ -229,7 +233,8 @@ export const api = {
   // ---------- Settings ----------
   getShopSettings: async (): Promise<ShopSettingsData> => {
     const s = await shopReady();
-    return ledger.getShopSettings(s.id);
+    if (!settingsCache) settingsCache = await ledger.getShopSettings(s.id);
+    return { ...settingsCache, shop: activeShop ?? settingsCache.shop };
   },
   updateShopProfile: async (payload: UpdateShopProfilePayload) => {
     const s = await shopReady();
@@ -245,15 +250,18 @@ export const api = {
   },
   updateInvoiceSettings: async (payload: Partial<InvoiceSettings>) => {
     const s = await shopReady();
-    return { message: 'Saved', invoice_settings: (await ledger.saveSettings(s.id, 'invoice', payload)).invoice_settings };
+    settingsCache = await ledger.saveSettings(s.id, 'invoice', payload);
+    return { message: 'Saved', invoice_settings: settingsCache.invoice_settings };
   },
   updateNotificationSettings: async (payload: Partial<NotificationSettings>) => {
     const s = await shopReady();
-    return { message: 'Saved', notification_settings: (await ledger.saveSettings(s.id, 'notifications', payload)).notification_settings };
+    settingsCache = await ledger.saveSettings(s.id, 'notifications', payload);
+    return { message: 'Saved', notification_settings: settingsCache.notification_settings };
   },
   updateAppPreferences: async (payload: Partial<AppPreferences>) => {
     const s = await shopReady();
-    return { message: 'Saved', app_preferences: (await ledger.saveSettings(s.id, 'preferences', payload)).app_preferences };
+    settingsCache = await ledger.saveSettings(s.id, 'preferences', payload);
+    return { message: 'Saved', app_preferences: settingsCache.app_preferences };
   },
   exportShopData: async (type: 'transactions' | 'parties' | 'reports') => {
     const s = await shopReady();

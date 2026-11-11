@@ -15,7 +15,7 @@ const PAGE = 50;
 
 /** §9 History: every bill, payment and return, with search, filters, pagination and details. */
 export const HistoryPage: React.FC = () => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const [params, setParams] = useSearchParams();
   const [kind, setKind] = useState<typeof KINDS[number]>('ALL');
   const [q, setQ] = useState('');
@@ -56,12 +56,12 @@ export const HistoryPage: React.FC = () => {
     const yesterday = y.toISOString().slice(0, 10);
     const out: { label: string; rows: TxRow[] }[] = [];
     for (const r of page) {
-      const label = r.invoice_date === today ? t('today') : r.invoice_date === yesterday ? t('yesterday') : r.invoice_date;
+      const label = r.invoice_date === today ? t('today') : r.invoice_date === yesterday ? t('yesterday') : fmtDate(r.invoice_date);
       if (!out.length || out[out.length - 1].label !== label) out.push({ label, rows: [] });
       out[out.length - 1].rows.push(r);
     }
     return out;
-  }, [page, t]);
+  }, [page, t, fmtDate]);
 
   const open = (r: TxRow) => {
     const next = new URLSearchParams(params);

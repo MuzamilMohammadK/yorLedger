@@ -15,7 +15,7 @@ const VIEW_IDS = ['party', 'sales', 'purchases'] as const;
 
 /** §8 Ledger: circular Party → Sales → Purchases pager; the main bill entry experience. */
 export const LedgerPage: React.FC = () => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const shell = useShell();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -112,7 +112,7 @@ export const LedgerPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {statement.map(r => (
                     <tr key={`${r.type}-${r.id}`} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/history?bill=${r.bill_id}`)}>
-                      <td className="px-4 py-3 text-base whitespace-nowrap">{r.date}</td>
+                      <td className="px-4 py-3 text-base whitespace-nowrap">{fmtDate(r.date)}</td>
                       <td className="px-4 py-3 text-base">
                         {r.type === 'BILL' ? t(`kind_${r.kind}`) : r.type === 'PAYMENT' ? `${t('entry_payment')} (${t(`mode_${r.detail}` as any)})` : t('entry_return')} · #{r.invoice_no}
                       </td>

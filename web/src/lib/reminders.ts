@@ -7,6 +7,7 @@ import { formatPaiseToINR } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { todayIST } from './data/util';
 import { isAndroidApp } from './platform';
+import { api } from './api';
 
 type T = (key: any, vars?: Record<string, string | number>) => string;
 
@@ -128,8 +129,11 @@ export function startReminders(t: T): () => void {
   const run = () => {
     window.clearTimeout(pending);
     // Debounce: many bill changes arrive together on first load.
-    pending = window.setTimeout(() => {
-      const dues = collect(t);
+    pending = window.setTimeout(async () => {
+      // §12.6: respect "due reminders" and "phone / desktop notifications" switches.
+      const n = (await api.getShopSettings().catch(() => null))?.notification_settings;
+      const enabled = (n?.due_reminders ?? true) && (n?.push_notifications ?? true);
+      const dues = enabled ? collect(t) : [];
       (isAndroidApp ? syncAndroid(dues) : Promise.resolve(syncBrowser(dues))).catch(e => console.warn('Reminder sync failed', e));
     }, 1500);
   };

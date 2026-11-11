@@ -21,7 +21,7 @@ const BADGE: Record<string, string> = {
 
 /** §9.4 transaction details with the permitted actions. */
 export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void }> = ({ bill, onClose }) => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const { shop } = useAuth();
   const shell = useShell();
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
               <p className="text-xl font-bold text-slate-900">{bill.party_name}</p>
               <p className="text-base text-slate-600">{t(`type_${party?.type ?? bill.party_type}` as any)} · {party?.phone ?? ''}</p>
               <p className="text-sm text-slate-500">{party?.gstin ?? '—'} · {getStateByCode(party?.state_code ?? '')?.name ?? '—'}</p>
-              <p className="text-base text-slate-700 mt-1">{t('date')}: <b>{bill.invoice_date}</b> · {raw?.tax_mode === 'INTER' ? t('other_state') : t('same_state')}</p>
+              <p className="text-base text-slate-700 mt-1">{t('date')}: <b>{fmtDate(bill.invoice_date)}</b> · {raw?.tax_mode === 'INTER' ? t('other_state') : t('same_state')}</p>
             </div>
             <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold ${BADGE[st]}`}>{t(`status_${st}` as any)}</span>
           </div>
@@ -101,7 +101,7 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
             {row(t('paid'), `− ${rs(bill.paid_paise)}`)}
             {row(t('remaining'), rs(bill.pending_paise), true)}
             {credit > 0 && row(t('credit'), rs(credit))}
-            {raw?.remind_on && row(t('reminder'), `${raw.remind_on} · ${raw.remind_lead_days ? t('days_before', { n: raw.remind_lead_days }) : t('on_the_day')}`)}
+            {raw?.remind_on && row(t('reminder'), `${fmtDate(raw.remind_on)} · ${raw.remind_lead_days ? t('days_before', { n: raw.remind_lead_days }) : t('on_the_day')}`)}
             {raw?.notes && row(t('notes'), raw.notes)}
             <p className="pt-1 text-sm text-slate-500">{t('created_on', { date: fmt(bill.created_at) })} · {t('updated_on', { date: fmt(bill.updated_at) })}</p>
           </div>
@@ -113,7 +113,7 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
               <div className="space-y-2">
                 {bill.payments.map(p => (
                   <div key={p.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="flex justify-between text-base"><span className="font-semibold">{t(`mode_${p.payment_mode}` as any)} · {p.payment_date}</span><span className="font-bold">{rs(p.amount_paise)}</span></div>
+                    <div className="flex justify-between text-base"><span className="font-semibold">{t(`mode_${p.payment_mode}` as any)} · {fmtDate(p.payment_date)}</span><span className="font-bold">{rs(p.amount_paise)}</span></div>
                     <p className="text-sm text-slate-500">
                       {p.payment_mode === 'NEFT' && `UTR ${p.reference_number}`}
                       {p.payment_mode === 'CHEQUE' && `${t('cheque_no')} ${p.cheque_number ?? '—'} · ${t('deposit_date')} ${p.deposit_date ?? '—'}`}
@@ -141,7 +141,7 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
               <h3 className="text-base font-bold text-slate-900 mb-2">{t('returns_list')}</h3>
               {bill.returns.map(r => (
                 <div key={r.id} className="p-3 mb-2 rounded-xl bg-slate-50 border border-slate-200 flex justify-between text-base">
-                  <span>{r.return_date}{r.reason ? ` · ${r.reason}` : ''}</span><span className="font-bold">− {rs(r.amount_paise)}</span>
+                  <span>{fmtDate(r.return_date)}{r.reason ? ` · ${r.reason}` : ''}</span><span className="font-bold">− {rs(r.amount_paise)}</span>
                 </div>
               ))}
             </section>

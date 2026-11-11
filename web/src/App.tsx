@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { useI18n } from './i18n';
 import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
@@ -18,6 +19,9 @@ import { LedgerPage } from './pages/LedgerPage';
 import { DuesPage } from './pages/DuesPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
+
+/** §12.8 default landing page preference. */
+const LandingRedirect: React.FC = () => <Navigate to={useI18n().landing} replace />;
 
 export const App: React.FC = () => {
   return (
@@ -49,7 +53,7 @@ export const App: React.FC = () => {
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/reports" element={<AnalyticsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<LandingRedirect />} />
               </Route>
 
               {/* Catch-all */}

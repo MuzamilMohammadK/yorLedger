@@ -1,1054 +1,282 @@
-import React, { useState, useEffect } from 'react';
-import { DashboardLayout } from '../components/layout/DashboardLayout';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Store, Receipt, FileText, Bell, KeyRound, SlidersHorizontal, Database, Info, CheckCircle2, Loader2, ImagePlus, Trash2, Download, LogOut } from 'lucide-react';
+import { AppPreferences, InvoiceSettings, NotificationSettings, ShopSettingsData, getStateByCode } from '@yorbalance/shared';
 import { useAuth } from '../context/AuthContext';
+import { useI18n, LANGUAGES, Lang, DATE_FORMATS, DateFormat, Theme, LANDING_PAGES, formatDate } from '../i18n';
 import { api } from '../lib/api';
-import { useI18n, LANGUAGES, Lang } from '../i18n';
-import { INDIAN_STATES } from '@yorbalance/shared';
-import {
-  ShopSettingsData,
-  InvoiceSettings,
-  NotificationSettings,
-  AppPreferences
-} from '@yorbalance/shared';
-import {
-  Store,
-  FileSpreadsheet,
-  Receipt,
-  Bell,
-  ShieldCheck,
-  Sliders,
-  Database,
-  HelpCircle,
-  Save,
-  CheckCircle2,
-  AlertTriangle,
-  Download,
-  LogOut,
-  KeyRound,
-  Info
-} from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { compressLogo } from '../lib/image';
+import { shareFile } from '../lib/platform';
 
-type SettingsTab =
-  | 'profile'
-  | 'gst'
-  | 'invoice'
-  | 'notifications'
-  | 'account'
-  | 'preferences'
-  | 'backup'
-  | 'about';
+type Section = 'profile' | 'gst' | 'invoice' | 'notifications' | 'account' | 'prefs' | 'backup' | 'about';
+const SECTIONS: { id: Section; key: string; icon: typeof Store }[] = [
+  { id: 'profile', key: 'set_profile', icon: Store }, { id: 'gst', key: 'set_gst', icon: Receipt },
+  { id: 'invoice', key: 'set_invoice', icon: FileText }, { id: 'notifications', key: 'set_notifications', icon: Bell },
+  { id: 'account', key: 'set_account', icon: KeyRound }, { id: 'prefs', key: 'set_prefs', icon: SlidersHorizontal },
+  { id: 'backup', key: 'set_backup', icon: Database }, { id: 'about', key: 'set_about', icon: Info }
+];
+const APP_VERSION = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'dev';
+const REPO = 'https://github.com/MuzamilMohammadK/yorLedger';
 
+/** §12 Settings: eight sections; every control saves and takes effect. */
 export const SettingsPage: React.FC = () => {
+  const { t, lang, setLang, theme, setTheme, dateFormat, setDateFormat, landing, setLanding, fmtDate } = useI18n();
   const { shop, user, logout, sendResetEmail, refreshSession } = useAuth();
-  const { lang, setLang } = useI18n();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Form states initialized
-  const [profileForm, setProfileForm] = useState({
-    name: '',
-    owner_name: '',
-    phone: '',
-    email: '',
-    address: '',
-    state: 'Karnataka',
-    state_code: '29',
-    pin_code: '',
-    logo_url: ''
-  });
-
-  const [gstForm, setGstForm] = useState({
-    gst_status: 'REGISTERED' as 'REGISTERED' | 'UNREGISTERED' | 'COMPOSITION',
-    gstin: '',
-    legal_name: '',
-    state_code: '29',
-    default_gst_bp: 500
-  });
-
-  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({
-    invoice_prefix: 'INV-',
-    suggested_next_number: 1001,
-    date_format: 'DD/MM/YYYY',
-    show_logo: true,
-    show_gstin: true,
-    show_tax_breakdown: true,
-    invoice_footer: 'Thank you for your patronage! Handloom silk sarees are guaranteed authentic.',
-    terms_and_conditions: '1. No exchanges or returns after silk saree blouse fabric has been detached or altered.\n2. In case of manufacturing defect, report within 7 days with bill.\n3. All disputes subject to local jurisdiction.'
-  });
-
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    push_notifications: true,
-    in_app_notifications: true,
-    due_reminders: true,
-    reminder_lead_time_days: 3,
-    daily_reminder_time: '08:00'
-  });
-
-  const [appPreferences, setAppPreferences] = useState<AppPreferences>({
-    currency: 'INR',
-    time_zone: 'Asia/Kolkata',
-    date_format: 'DD/MM/YYYY',
-    theme: 'light',
-    language: 'en',
-    default_landing_page: '/dashboard'
-  });
-
-  const [resetEmailSent, setResetEmailSent] = useState(false);
-
-  // Load all settings from backend API
-  const loadSettings = async () => {
-    setLoading(true);
-    try {
-      const data: ShopSettingsData = await api.getShopSettings();
-      if (data.shop) {
-        setProfileForm({
-          name: data.shop.name || '',
-          owner_name: data.shop.owner_name || '',
-          phone: data.shop.phone || '',
-          email: data.shop.email || '',
-          address: data.shop.address || '',
-          state: data.shop.state || 'Karnataka',
-          state_code: data.shop.state_code || '29',
-          pin_code: data.shop.pin_code || '',
-          logo_url: data.shop.logo_url || ''
-        });
-
-        setGstForm({
-          gst_status: (data.shop.gstin ? 'REGISTERED' : 'UNREGISTERED') as any,
-          gstin: data.shop.gstin || '',
-          legal_name: data.shop.name || '',
-          state_code: data.shop.state_code || '29',
-          default_gst_bp: data.shop.default_gst_bp || 500
-        });
-      }
-
-      if (data.invoice_settings) {
-        setInvoiceSettings(data.invoice_settings);
-      }
-      if (data.notification_settings) {
-        setNotificationSettings(data.notification_settings);
-      }
-      if (data.app_preferences) {
-        setAppPreferences(data.app_preferences);
-      }
-    } catch (err: any) {
-      console.error('Failed to load shop settings', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const navigate = useNavigate();
+  const [section, setSection] = useState<Section>('profile');
+  const [data, setData] = useState<ShopSettingsData | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [profile, setProfile] = useState({ owner_name: '', phone: '', email: '', address: '', pin_code: '' });
+  const [gstRate, setGstRate] = useState('5');
+  const [inv, setInv] = useState<InvoiceSettings | null>(null);
+  const [notif, setNotif] = useState<NotificationSettings | null>(null);
+  const logoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadSettings();
+    api.getShopSettings().then(d => {
+      setData(d);
+      setProfile({ owner_name: d.shop.owner_name, phone: d.shop.phone, email: d.shop.email, address: d.shop.address, pin_code: d.shop.pin_code ?? '' });
+      setGstRate(String(d.shop.default_gst_bp / 100));
+      setInv(d.invoice_settings);
+      setNotif(d.notification_settings);
+    }).catch(e => setMsg({ ok: false, text: e.message }));
   }, []);
 
-  const triggerAlert = (msg: string, isError = false) => {
-    if (isError) {
-      setErrorMsg(msg);
-      setSuccessMsg(null);
-    } else {
-      setSuccessMsg(msg);
-      setErrorMsg(null);
-    }
-    setTimeout(() => {
-      setSuccessMsg(null);
-      setErrorMsg(null);
-    }, 4500);
-  };
-
-  // Section 1: Save Shop Profile
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profileForm.name.trim()) return triggerAlert('Shop name is required', true);
-    if (!profileForm.phone.trim()) return triggerAlert('Phone number is required', true);
-    setSaving(true);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setMsg(null);
     try {
-      await api.updateShopProfile(profileForm);
-      await refreshSession();
-      triggerAlert('Shop profile updated successfully!');
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to update shop profile', true);
+      await fn();
+      setMsg({ ok: true, text: t('saved') });
+    } catch (e: any) {
+      setMsg({ ok: false, text: e.message ?? t('error_generic') });
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
 
-  // Section 2: Save GST & Tax Settings
-  const handleSaveGST = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (gstForm.gst_status === 'REGISTERED') {
-      const gstinClean = gstForm.gstin.trim().toUpperCase();
-      if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstinClean)) {
-        return triggerAlert('Please enter a valid 15-character GSTIN (e.g. 29ABCDE1234F1Z5)', true);
-      }
-    }
-    setSaving(true);
-    try {
-      await api.updateGSTSettings({
-        gstin: gstForm.gst_status === 'REGISTERED' ? gstForm.gstin.trim().toUpperCase() : '',
-        default_gst_bp: Number(gstForm.default_gst_bp),
-        state_code: gstForm.state_code
-      });
-      await refreshSession();
-      triggerAlert('GST & Tax settings updated! New rate will apply to newly created bills.');
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to update GST settings', true);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const savePrefs = (patch: Partial<AppPreferences>) => api.updateAppPreferences(patch).catch(() => undefined);
+  const field = 'w-full h-12 px-3 rounded-xl border-2 border-slate-200 bg-white text-base text-slate-900 focus:border-indigo-600 focus:outline-none';
+  const lbl = 'block text-base font-semibold text-slate-800';
+  const saveBtn = (onClick: () => void) => (
+    <button onClick={onClick} disabled={busy} className="w-full sm:w-auto h-12 px-6 rounded-xl bg-indigo-700 text-white text-base font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+      {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null}{t('save')}
+    </button>
+  );
+  const toggle = (label: string, on: boolean, set: (v: boolean) => void) => (
+    <label className="flex items-center justify-between gap-4 min-h-12 py-2 border-b border-slate-100 last:border-0 cursor-pointer">
+      <span className="text-base text-slate-800">{label}</span>
+      <input type="checkbox" checked={on} onChange={e => set(e.target.checked)} className="w-6 h-6 accent-indigo-700" />
+    </label>
+  );
+  const info = (label: string, value?: React.ReactNode) => (
+    <div className="flex justify-between gap-4 py-2 border-b border-slate-100 last:border-0">
+      <span className="text-base text-slate-500">{label}</span><span className="text-base font-semibold text-slate-900 text-right break-all">{value || '—'}</span>
+    </div>
+  );
 
-  // Section 3: Save Invoice Settings
-  const handleSaveInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.updateInvoiceSettings(invoiceSettings);
-      triggerAlert('Invoice settings and branding saved successfully!');
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to update invoice settings', true);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const exportCsv = (type: 'transactions' | 'parties') => run(async () => {
+    const csv = await api.exportShopData(type);
+    await shareFile(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `yorledger-${type}-${new Date().toISOString().slice(0, 10)}.csv`, type);
+  });
 
-  // Section 4: Save Notification Settings
-  const handleSaveNotifications = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.updateNotificationSettings(notificationSettings);
-      triggerAlert('Notification preferences saved! 08:00 IST reminder job preserved.');
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to update notifications', true);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Section 5: Password Reset
-  const handlePasswordReset = async () => {
-    if (!user?.email) return;
-    try {
-      await sendResetEmail(user.email);
-      setResetEmailSent(true);
-      triggerAlert(`Password reset link sent to ${user.email}`);
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to send password reset email', true);
-    }
-  };
-
-  // Section 6: Save App Preferences
-  const handleSavePreferences = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.updateAppPreferences(appPreferences);
-      triggerAlert('App display preferences saved!');
-    } catch (err: any) {
-      triggerAlert(err.message || 'Failed to update preferences', true);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Section 7: Export CSV handler
-  const handleDownloadCSV = async (type: 'transactions' | 'parties' | 'reports') => {
-    try {
-      const csv = await api.exportShopData(type);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `yorledger_${type}_export_${Date.now()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      triggerAlert(`${type.toUpperCase()} data exported successfully!`);
-    } catch (err: any) {
-      triggerAlert('Failed to generate export file', true);
-    }
-  };
-
-  const navSections = [
-    { id: 'profile', name: '1. Shop Profile', icon: Store, desc: 'Contact details, address & branding' },
-    { id: 'gst', name: '2. GST & Tax Settings', icon: FileSpreadsheet, desc: 'GSTIN, state code & default rates' },
-    { id: 'invoice', name: '3. Invoice Settings', icon: Receipt, desc: 'Prefix, next bill # & T&C terms' },
-    { id: 'notifications', name: '4. Notifications', icon: Bell, desc: 'Lead time reminders & 8 AM IST alerts' },
-    { id: 'account', name: '5. Account & Security', icon: KeyRound, desc: 'Owner login, password & sessions' },
-    { id: 'preferences', name: '6. App Preferences', icon: Sliders, desc: 'INR, Asia/Kolkata & landing page' },
-    { id: 'backup', name: '7. Data & Backup', icon: Database, desc: 'Cloud SQL snapshots & CSV exports' },
-    { id: 'about', name: '8. About YorLedger', icon: HelpCircle, desc: 'Version 1.0.0, support & terms' }
-  ];
+  const statusCls = shop?.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : shop?.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900';
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Page Header */}
-        <div className="pb-4 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold uppercase tracking-wider text-purple-600">
-              System Configuration
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-sm font-bold bg-purple-50 text-purple-700">
-              YorLedger v1.0.0
-            </span>
-          </div>
-          <h1 className="font-serif-display text-2xl font-bold text-slate-900 mt-1">
-            Shop Settings & Configuration
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Manage your saree business profile, tax parameters, invoice formats, notifications, and automated backups.
-          </p>
-        </div>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-slate-900">{t('nav_settings')}</h1>
+      <div className="md:grid md:grid-cols-[16rem_1fr] md:gap-6">
+        {/* Section list: chips on phones, side list on desktop */}
+        <nav className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
+          {SECTIONS.map(s => (
+            <button key={s.id} onClick={() => { setSection(s.id); setMsg(null); }}
+              className={`shrink-0 h-12 px-4 rounded-xl text-base font-semibold flex items-center gap-2 text-left ${section === s.id ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+              <s.icon className="w-5 h-5 shrink-0" /> {t(s.key as any)}
+            </button>
+          ))}
+        </nav>
 
-        {/* Global Feedback Banners */}
-        {successMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-sm font-semibold shadow-xs animate-in fade-in duration-200">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        )}
-        {errorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-sm font-semibold shadow-xs animate-in fade-in duration-200">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+        <div className="mt-3 md:mt-0 rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 space-y-4">
+          <h2 className="text-xl font-bold text-slate-900">{t(SECTIONS.find(s => s.id === section)!.key as any)}</h2>
+          {msg && (
+            <p className={`p-3 rounded-xl text-base flex items-center gap-2 ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+              {msg.ok && <CheckCircle2 className="w-5 h-5" />} {msg.text}
+            </p>
+          )}
+          {!data && <Loader2 className="w-8 h-8 animate-spin text-slate-400" />}
 
-        {/* Settings Layout: Left Nav Tabs + Right Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          {/* Section Selector Menu */}
-          <div className="bg-white rounded-3xl p-3 border border-slate-200 shadow-xs space-y-1">
-            {navSections.map(sec => {
-              const Icon = sec.icon;
-              const isActive = activeTab === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  onClick={() => setActiveTab(sec.id as SettingsTab)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-all ${
-                    isActive
-                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-950/20'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm block truncate">{sec.name}</span>
-                    <span className={`text-sm block truncate ${isActive ? 'text-purple-200' : 'text-slate-400'}`}>
-                      {sec.desc}
-                    </span>
+          {/* 1. Shop profile (§12.3) */}
+          {data && section === 'profile' && (
+            <div className="space-y-4">
+              {info(t('business_name'), data.shop.name)}
+              {info(t('verification_status'), <span className={`px-3 py-1 rounded-full text-sm font-bold ${statusCls}`}>{t(`decision_${shop?.status}` as any) || shop?.status}</span>)}
+              <p className="text-sm text-slate-500">{t('name_needs_review')}</p>
+              <label className={lbl}>{t('owner_name')}<input value={profile.owner_name} onChange={e => setProfile({ ...profile, owner_name: e.target.value })} className={`${field} mt-1`} /></label>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <label className={lbl}>{t('mobile')}<input type="tel" value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} className={`${field} mt-1`} /></label>
+                <label className={lbl}>{t('email')}<input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} className={`${field} mt-1`} /></label>
+              </div>
+              <label className={lbl}>{t('address')}<textarea rows={2} value={profile.address} onChange={e => setProfile({ ...profile, address: e.target.value })} className={`${field} mt-1 h-auto py-2`} /></label>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {info(t('state'), getStateByCode(data.shop.state_code)?.name)}
+                <label className={lbl}>{t('pin')}<input inputMode="numeric" value={profile.pin_code} onChange={e => setProfile({ ...profile, pin_code: e.target.value.replace(/\D/g, '').slice(0, 6) })} className={`${field} mt-1`} /></label>
+              </div>
+              <div>
+                <p className={lbl}>{t('shop_logo')}</p>
+                <p className="text-sm text-slate-500">{t('logo_hint')}</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="w-20 h-20 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">
+                    {inv?.logo_data_url ? <img src={inv.logo_data_url} alt={t('shop_logo')} className="w-full h-full object-contain" /> : <ImagePlus className="w-7 h-7 text-slate-400" />}
                   </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Section Content Container */}
-          <div className="lg:col-span-3 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs">
-            {/* SECTION 1: Shop Profile */}
-            {activeTab === 'profile' && (
-              <form onSubmit={handleSaveProfile} className="space-y-6">
-                <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-serif-display text-base font-bold text-slate-900">1. Shop Profile & Identity</h3>
-                    <p className="text-sm text-slate-500">Business registration details, owner contact and official address.</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-semibold">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Verified: {shop?.status || 'APPROVED'}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Shop / Business Name *</label>
-                    <input
-                      type="text"
-                      value={profileForm.name}
-                      onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Proprietor / Owner Name *</label>
-                    <input
-                      type="text"
-                      value={profileForm.owner_name}
-                      onChange={e => setProfileForm({ ...profileForm, owner_name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Primary Mobile Number *</label>
-                    <input
-                      type="tel"
-                      value={profileForm.phone}
-                      onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      value={profileForm.email}
-                      onChange={e => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-slate-700 font-semibold mb-1">Full Shop Address *</label>
-                    <textarea
-                      rows={2}
-                      value={profileForm.address}
-                      onChange={e => setProfileForm({ ...profileForm, address: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">State / Province *</label>
-                    <select
-                      value={profileForm.state_code}
-                      onChange={e => {
-                        const sel = INDIAN_STATES.find(s => s.code === e.target.value);
-                        setProfileForm({
-                          ...profileForm,
-                          state_code: e.target.value,
-                          state: sel?.name || profileForm.state
-                        });
-                      }}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer"
-                    >
-                      {INDIAN_STATES.map(s => (
-                        <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Postal PIN Code</label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={profileForm.pin_code}
-                      onChange={e => setProfileForm({ ...profileForm, pin_code: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
-                      placeholder="560002"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-slate-700 font-semibold mb-1">Shop Logo URL</label>
-                    <input
-                      type="url"
-                      value={profileForm.logo_url}
-                      onChange={e => setProfileForm({ ...profileForm, logo_url: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                      placeholder="https://example.com/logo.png"
-                    />
-                    <span className="text-sm text-slate-400 mt-1 block">
-                      Displayed on PDF invoices, transaction receipts, and customer WhatsApp summaries.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Save Profile Changes'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* SECTION 2: GST & Tax Settings */}
-            {activeTab === 'gst' && (
-              <form onSubmit={handleSaveGST} className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">2. GST & Tax Configurations</h3>
-                  <p className="text-sm text-slate-500">Statutory tax identifier, registered state, and default billing GST rates.</p>
-                </div>
-
-                {/* Statutory Immutability Guarantee Notice */}
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-amber-900 text-sm">
-                  <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                  <div className="leading-relaxed">
-                    <strong className="block text-amber-950 font-semibold mb-0.5">
-                      Statutory Historical Tax Immutability Rule:
-                    </strong>
-                    Changing the default GST rate below applies <strong>ONLY to newly created bills and transactions</strong>.
-                    Past recorded bills preserve their exact historical tax snapshot (CGST/SGST/IGST paise) and will never be recalculated or altered.
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">GST Registration Type</label>
-                    <select
-                      value={gstForm.gst_status}
-                      onChange={e => setGstForm({ ...gstForm, gst_status: e.target.value as any })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
-                    >
-                      <option value="REGISTERED">Regular GST Registered (Eligible for ITC)</option>
-                      <option value="COMPOSITION">Composition Scheme Dealer (CMP-08)</option>
-                      <option value="UNREGISTERED">Unregistered Retailer (Under ₹40 Lakhs)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">GSTIN Identifier (15 Characters)</label>
-                    <input
-                      type="text"
-                      maxLength={15}
-                      value={gstForm.gstin}
-                      onChange={e => setGstForm({ ...gstForm, gstin: e.target.value.toUpperCase() })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono uppercase"
-                      placeholder="29ABCDE1234F1Z5"
-                      disabled={gstForm.gst_status === 'UNREGISTERED'}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Default GST Rate for New Saree Items</label>
-                    <select
-                      value={gstForm.default_gst_bp}
-                      onChange={e => setGstForm({ ...gstForm, default_gst_bp: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-semibold"
-                    >
-                      <option value={500}>5% GST (Standard Silk Sarees & Handlooms)</option>
-                      <option value={1200}>12% GST (High-Value Silk & Embroidery Job-Work)</option>
-                      <option value={1800}>18% GST (Synthetic Silk & Tailoring Accessories)</option>
-                      <option value={0}>0% GST (Exempt Khadi & Raw Cocoons)</option>
-                    </select>
-                    <span className="text-sm text-slate-400 mt-1 block">
-                      Stored in basis points: {gstForm.default_gst_bp} bp = {(gstForm.default_gst_bp / 100).toFixed(1)}%
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">State Code (POS Baseline)</label>
-                    <input
-                      type="text"
-                      value={gstForm.state_code}
-                      readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm font-mono cursor-not-allowed"
-                    />
-                    <span className="text-sm text-slate-400 mt-1 block">
-                      Determines Intra-State (CGST+SGST) vs Inter-State (IGST) split.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Update Tax Preferences'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* SECTION 3: Invoice Settings */}
-            {activeTab === 'invoice' && (
-              <form onSubmit={handleSaveInvoice} className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">3. Invoice Branding & Formatting</h3>
-                  <p className="text-sm text-slate-500">Configure sequential billing numbers, tax breakdown display, and terms.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Invoice Prefix</label>
-                    <input
-                      type="text"
-                      value={invoiceSettings.invoice_prefix}
-                      onChange={e => setInvoiceSettings({ ...invoiceSettings, invoice_prefix: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
-                      placeholder="INV-"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Suggested Next Invoice #</label>
-                    <input
-                      type="number"
-                      value={invoiceSettings.suggested_next_number}
-                      onChange={e => setInvoiceSettings({ ...invoiceSettings, suggested_next_number: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Invoice Date Format</label>
-                    <select
-                      value={invoiceSettings.date_format}
-                      onChange={e => setInvoiceSettings({ ...invoiceSettings, date_format: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
-                    >
-                      <option value="DD/MM/YYYY">DD/MM/YYYY (Indian Standard)</option>
-                      <option value="DD-MMM-YYYY">DD-MMM-YYYY (e.g. 05-Nov-2026)</option>
-                      <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Display Toggles */}
-                <div className="space-y-3 pt-2">
-                  <span className="text-sm font-bold text-slate-800 block">Bill Display Preferences</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={invoiceSettings.show_logo}
-                        onChange={e => setInvoiceSettings({ ...invoiceSettings, show_logo: e.target.checked })}
-                        className="rounded text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="font-medium text-slate-800">Print Shop Logo</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={invoiceSettings.show_gstin}
-                        onChange={e => setInvoiceSettings({ ...invoiceSettings, show_gstin: e.target.checked })}
-                        className="rounded text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="font-medium text-slate-800">Print GSTIN Header</span>
-                    </label>
-
-                    <label className="flex items-center gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={invoiceSettings.show_tax_breakdown}
-                        onChange={e => setInvoiceSettings({ ...invoiceSettings, show_tax_breakdown: e.target.checked })}
-                        className="rounded text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="font-medium text-slate-800">Show Tax Breakdown</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-2 text-sm">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Invoice Footer Greeting</label>
-                    <input
-                      type="text"
-                      value={invoiceSettings.invoice_footer}
-                      onChange={e => setInvoiceSettings({ ...invoiceSettings, invoice_footer: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Standard Terms & Conditions</label>
-                    <textarea
-                      rows={3}
-                      value={invoiceSettings.terms_and_conditions}
-                      onChange={e => setInvoiceSettings({ ...invoiceSettings, terms_and_conditions: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm leading-relaxed"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Save Invoice Formatting'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* SECTION 4: Notification Settings */}
-            {activeTab === 'notifications' && (
-              <form onSubmit={handleSaveNotifications} className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">4. Notification & Due Reminders</h3>
-                  <p className="text-sm text-slate-500">Configure reminder lead times, in-app notifications and morning dispatch schedule.</p>
-                </div>
-
-                {/* 08:00 AM IST Cron Notice */}
-                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3 text-purple-900 text-sm">
-                  <Bell className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
-                  <div className="leading-relaxed">
-                    <strong className="block text-purple-950 font-semibold mb-0.5">
-                      Scheduled Daily 08:00 AM IST Due Dispatch:
-                    </strong>
-                    YorLedger runs an automated morning reminder engine at exactly 08:00 AM IST (Asia/Kolkata).
-                    Pending customer dues and supplier payables matching your lead time threshold are compiled for dispatch.
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                    <div>
-                      <span className="font-semibold text-slate-900 block">Enable Automated Due Date Reminders</span>
-                      <span className="text-sm text-slate-500">Trigger alerts before customer credit bills mature</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.due_reminders}
-                      onChange={e => setNotificationSettings({ ...notificationSettings, due_reminders: e.target.checked })}
-                      className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                    <div>
-                      <span className="font-semibold text-slate-900 block">In-App Notification Center Badge</span>
-                      <span className="text-sm text-slate-500">Display unread badge alerts in navigation header</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.in_app_notifications}
-                      onChange={e => setNotificationSettings({ ...notificationSettings, in_app_notifications: e.target.checked })}
-                      className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer text-sm">
-                    <div>
-                      <span className="font-semibold text-slate-900 block">Web Push Notifications</span>
-                      <span className="text-sm text-slate-500">Receive desktop alerts when payment receipts are logged</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.push_notifications}
-                      onChange={e => setNotificationSettings({ ...notificationSettings, push_notifications: e.target.checked })}
-                      className="rounded text-purple-600 focus:ring-purple-500 h-4 w-4"
-                    />
-                  </label>
-                </div>
-
-                <div className="pt-2 text-sm">
-                  <label className="block text-slate-700 font-semibold mb-1">Reminder Lead Time (Notice Prior to Due Date)</label>
-                  <select
-                    value={notificationSettings.reminder_lead_time_days}
-                    onChange={e => setNotificationSettings({ ...notificationSettings, reminder_lead_time_days: Number(e.target.value) as any })}
-                    className="w-full sm:w-64 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-semibold"
-                  >
-                    <option value={0}>On the Due Date (0 days before)</option>
-                    <option value={1}>1 Day Before Maturity</option>
-                    <option value={3}>3 Days Before Maturity (Recommended)</option>
-                    <option value={7}>7 Days Before Maturity (1 Week Advance)</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Save Notification Preferences'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* SECTION 5: Account & Security */}
-            {activeTab === 'account' && (
-              <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">5. Account & Security</h3>
-                  <p className="text-sm text-slate-500">Firebase Authentication credentials, password recovery and session termination.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-400 font-semibold block text-sm uppercase">Registered Owner Email</span>
-                    <strong className="text-slate-900 font-medium text-sm block mt-0.5">{user?.email || 'N/A'}</strong>
-                    <span className="text-slate-500 text-sm">Primary authentication ID</span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-400 font-semibold block text-sm uppercase">Assigned User Role</span>
-                    <strong className="text-purple-700 font-bold text-sm block mt-0.5">{user?.role || 'SHOP_OWNER'}</strong>
-                    <span className="text-slate-500 text-sm">Full Tenant Administration Rights</span>
-                  </div>
-                </div>
-
-                {/* Password Reset Section */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h4 className="font-semibold text-sm text-slate-900">Reset Account Password</h4>
-                      <p className="text-sm text-slate-500 mt-0.5">
-                        A secure password reset verification link will be sent to your registered email via Firebase Auth.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handlePasswordReset}
-                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 font-semibold text-sm transition-colors shrink-0 shadow-xs"
-                    >
-                      Send Reset Link
-                    </button>
-                  </div>
-                  {resetEmailSent && (
-                    <div className="text-sm text-emerald-700 font-medium flex items-center gap-1.5 pt-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Check your inbox for the password reset instructions.
-                    </div>
+                  <input ref={logoInput} type="file" accept="image/jpeg,image/png" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(async () => { const url = await compressLogo(f); const r = await api.updateInvoiceSettings({ logo_data_url: url }); setInv(r.invoice_settings); }); }} />
+                  <button onClick={() => logoInput.current?.click()} className="h-11 px-4 rounded-xl border-2 border-indigo-300 text-indigo-800 text-base font-semibold">{inv?.logo_data_url ? t('replace') : t('add_photo')}</button>
+                  {inv?.logo_data_url && (
+                    <button onClick={() => run(async () => { const r = await api.updateInvoiceSettings({ logo_data_url: null }); setInv(r.invoice_settings); })}
+                      className="h-11 px-3 rounded-xl border-2 border-slate-200 text-base font-semibold flex items-center gap-1"><Trash2 className="w-5 h-5" /> {t('remove')}</button>
                   )}
                 </div>
-
-                {/* Sign-Out Action */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-semibold text-slate-800 block">Sign Out of Session</span>
-                    <span className="text-sm text-slate-400">Terminates active browser authentication tokens</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await logout();
-                      window.location.href = '/login';
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-sm transition-colors border border-rose-200"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Log Out</span>
-                  </button>
-                </div>
               </div>
-            )}
+              {saveBtn(() => run(async () => { await api.updateShopProfile(profile); await refreshSession(); }))}
+            </div>
+          )}
 
-            {/* SECTION 6: App Preferences */}
-            {activeTab === 'preferences' && (
-              <form onSubmit={handleSavePreferences} className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">6. Display & Regional Preferences</h3>
-                  <p className="text-sm text-slate-500">Formatting standards, retail counter theme, and default starting screen.</p>
-                </div>
+          {/* 2. GST & tax (§12.4) */}
+          {data && section === 'gst' && (
+            <div className="space-y-4">
+              {info(t('gst_registration'), t('gst_registered'))}
+              {info(t('gstin'), <span className="font-mono">{data.shop.gstin}</span>)}
+              {info(t('registered_name'), data.shop.name)}
+              {info(t('state'), `${getStateByCode(data.shop.state_code)?.name ?? ''} (${data.shop.state_code})`)}
+              <p className="text-sm text-slate-500">{t('name_needs_review')}</p>
+              <label className={lbl}>{t('default_gst')}
+                <select value={gstRate} onChange={e => setGstRate(e.target.value)} className={`${field} mt-1`}>
+                  {['0', '5', '12', '18', '28'].map(r => <option key={r} value={r}>{r}%</option>)}
+                </select>
+              </label>
+              <p className="text-base text-slate-600">{t('default_gst_hint')}</p>
+              <p className="p-3 rounded-xl bg-slate-50 text-base text-slate-700">{t('tax_rule_hint')}</p>
+              {saveBtn(() => run(async () => { await api.updateGSTSettings({ default_gst_bp: Math.round(Number(gstRate) * 100) }); await refreshSession(); }))}
+            </div>
+          )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Standard Operating Currency</label>
-                    <input
-                      type="text"
-                      value="INR (₹) – Indian Rupee (Stored in Integer Paise)"
-                      readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm cursor-not-allowed font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Business Time Zone</label>
-                    <input
-                      type="text"
-                      value="Asia/Kolkata (IST, UTC +05:30)"
-                      readOnly
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-sm cursor-not-allowed font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Default Landing Screen Upon Sign-In</label>
-                    <select
-                      value={appPreferences.default_landing_page}
-                      onChange={e => setAppPreferences({ ...appPreferences, default_landing_page: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm cursor-pointer font-medium"
-                    >
-                      <option value="/dashboard">Overview Dashboard</option>
-                                            <option value="/dues">Dues & Collections</option>
-                      <option value="/analytics">Reports & GST Analytics</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Interface Language</label>
-                    <select
-                      value={lang}
-                      onChange={e => { setLang(e.target.value as Lang); setAppPreferences({ ...appPreferences, language: e.target.value }); }}
-                      className="w-full h-12 px-3.5 rounded-xl border-2 border-slate-200 bg-white focus:outline-none focus:border-indigo-600 text-base cursor-pointer font-medium"
-                    >
-                      {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{saving ? 'Saving...' : 'Save App Preferences'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* SECTION 7: Data & Backup */}
-            {activeTab === 'backup' && (
-              <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">7. Data Ownership & Backup</h3>
-                  <p className="text-sm text-slate-500">Download complete CSV backups and review automated Cloud SQL disaster recovery.</p>
-                </div>
-
-                {/* Cloud SQL Snapshot Active Badge */}
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-sm font-bold text-emerald-950 block">Automated Cloud SQL Backup: Active</strong>
-                    <p className="text-sm text-emerald-800 mt-0.5 leading-relaxed">
-                      Daily automated point-in-time recovery (PITR) snapshots are managed on Google Cloud SQL with a 30-day retention policy.
-                      Multi-tenant isolation enforces strict partition security by your shop ID.
-                    </p>
-                  </div>
-                </div>
-
-                {/* One-Click CSV Downloads */}
-                <div className="space-y-3 pt-2">
-                  <span className="text-sm font-bold text-slate-900 block">Export Your Ledger Data (CSV Format)</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
-                      <div>
-                        <span className="font-semibold text-sm text-slate-900 block">Transaction Ledger</span>
-                        <span className="text-sm text-slate-500 mt-0.5 block">
-                          All recorded sales, purchases, job work and payment vouchers.
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadCSV('transactions')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
-                      >
-                        <Download className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Download CSV</span>
-                      </button>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
-                      <div>
-                        <span className="font-semibold text-sm text-slate-900 block">Party Directory</span>
-                        <span className="text-sm text-slate-500 mt-0.5 block">
-                          Customers, suppliers, and artisan contacts with balances.
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadCSV('parties')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
-                      >
-                        <Download className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Download CSV</span>
-                      </button>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
-                      <div>
-                        <span className="font-semibold text-sm text-slate-900 block">GST Summary Register</span>
-                        <span className="text-sm text-slate-500 mt-0.5 block">
-                          Itemized tax heads, eligible ITC and reconciliation data.
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadCSV('reports')}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-100 transition-colors shadow-xs"
-                      >
-                        <Download className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Download CSV</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+          {/* 3. Invoice settings (§12.5) — used by the bill PDF and the next-number suggestion */}
+          {inv && section === 'invoice' && (
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <label className={lbl}>{t('invoice_prefix')}<input value={inv.invoice_prefix} maxLength={10} onChange={e => setInv({ ...inv, invoice_prefix: e.target.value })} className={`${field} mt-1`} /></label>
+                <label className={lbl}>{t('next_number')}<input inputMode="numeric" value={inv.suggested_next_number || ''} onChange={e => setInv({ ...inv, suggested_next_number: Number(e.target.value.replace(/\D/g, '')) || 1 })} className={`${field} mt-1`} /></label>
               </div>
-            )}
-
-            {/* SECTION 8: About YorLedger */}
-            {activeTab === 'about' && (
-              <div className="space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h3 className="font-serif-display text-base font-bold text-slate-900">8. About YorLedger & Compliance</h3>
-                  <p className="text-sm text-slate-500">Application build metadata, developer information, terms and support.</p>
-                </div>
-
-                <div className="flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-900 to-slate-900 text-white shadow-sm">
-                  <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center font-serif-display font-bold text-xl text-amber-300">
-                    SB
-                  </div>
-                  <div>
-                    <h4 className="font-serif-display text-base font-bold">YorLedger</h4>
-                    <p className="text-sm text-purple-200">
-                      Version 1.0.0 Production Build (Build ID: 2026.11.05-REL)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                    <span className="font-semibold text-slate-900 block">Design & Engineering</span>
-                    <p className="text-slate-600 text-sm leading-relaxed">
-                      Custom-engineered for wholesale saree distributors, retail silk showrooms, handloom cooperatives, and artisan job-work units.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                    <span className="font-semibold text-slate-900 block">Help & Support Desk</span>
-                    <p className="text-slate-600 text-sm leading-relaxed">
-                      Technical support: <span className="font-mono text-purple-700">support@yorbalance.in</span>
-                      <br />
-                      Helpline: +91 98450 12345 (10:00 AM – 7:00 PM IST)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-4 space-y-2 text-sm text-slate-500">
-                  <div className="flex flex-wrap gap-4 font-semibold text-purple-700">
-                    <a href="#terms" onClick={e => { e.preventDefault(); alert('Terms of Service: YorLedger software is provided for business accounting record keeping in compliance with Indian GST regulations.'); }} className="hover:underline">
-                      Terms of Service
-                    </a>
-                    <span>•</span>
-                    <a href="#privacy" onClick={e => { e.preventDefault(); alert('Privacy Policy: All shop records, invoices and party information are encrypted and isolated strictly to your shop account.'); }} className="hover:underline">
-                      Privacy Policy
-                    </a>
-                    <span>•</span>
-                    <a href="#faq" onClick={e => { e.preventDefault(); alert('FAQ: For any GST reconciliation or return filing inquiries, consult your licensed Chartered Accountant.'); }} className="hover:underline">
-                      Statutory GST Notice
-                    </a>
-                  </div>
-                  <p className="text-sm text-slate-400">
-                    © 2026 YorLedger
-                  </p>
-                </div>
+              <p className="text-sm text-slate-500">{t('prefix_hint')}</p>
+              <label className={lbl}>{t('date_display')}
+                <select value={inv.date_format} onChange={e => setInv({ ...inv, date_format: e.target.value })} className={`${field} mt-1`}>
+                  {DATE_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </label>
+              <div>
+                {toggle(t('show_logo'), inv.show_logo, v => setInv({ ...inv, show_logo: v }))}
+                {toggle(t('show_gstin'), inv.show_gstin, v => setInv({ ...inv, show_gstin: v }))}
+                {toggle(t('show_tax_breakdown'), inv.show_tax_breakdown, v => setInv({ ...inv, show_tax_breakdown: v }))}
               </div>
-            )}
-          </div>
+              <label className={lbl}>{t('footer_text')}<textarea rows={2} value={inv.invoice_footer} onChange={e => setInv({ ...inv, invoice_footer: e.target.value })} className={`${field} mt-1 h-auto py-2`} /></label>
+              <label className={lbl}>{t('terms')}<textarea rows={3} value={inv.terms_and_conditions} onChange={e => setInv({ ...inv, terms_and_conditions: e.target.value })} className={`${field} mt-1 h-auto py-2`} /></label>
+              {saveBtn(() => run(async () => { const { logo_data_url: _l, ...rest } = inv; setInv((await api.updateInvoiceSettings(rest)).invoice_settings); }))}
+            </div>
+          )}
+
+          {/* 4. Notifications (§12.6) */}
+          {notif && section === 'notifications' && (
+            <div className="space-y-4">
+              <div>
+                {toggle(t('due_reminders_on'), notif.due_reminders, v => setNotif({ ...notif, due_reminders: v }))}
+                {toggle(t('device_notifications'), notif.push_notifications, v => setNotif({ ...notif, push_notifications: v }))}
+                {toggle(t('in_app_notices'), notif.in_app_notifications, v => setNotif({ ...notif, in_app_notifications: v }))}
+              </div>
+              <label className={lbl}>{t('default_lead')}
+                <select value={notif.reminder_lead_time_days} onChange={e => setNotif({ ...notif, reminder_lead_time_days: Number(e.target.value) as 0 | 1 | 3 | 7 })} className={`${field} mt-1`}>
+                  <option value={0}>{t('on_the_day')}</option><option value={1}>{t('one_day_before')}</option>
+                  <option value={3}>{t('days_before', { n: 3 })}</option><option value={7}>{t('days_before', { n: 7 })}</option>
+                </select>
+              </label>
+              <p className="text-base text-slate-600">{t('reminder_time')}</p>
+              {saveBtn(() => run(async () => setNotif((await api.updateNotificationSettings(notif)).notification_settings)))}
+            </div>
+          )}
+
+          {/* 5. Account & security (§12.7) */}
+          {section === 'account' && (
+            <div className="space-y-4">
+              {info(t('owner_name'), shop?.owner_name)}
+              {info(t('login_email'), user?.email)}
+              {info(t('last_sign_in'), auth.currentUser?.metadata.lastSignInTime ? new Date(auth.currentUser.metadata.lastSignInTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—')}
+              <button onClick={() => run(async () => { await sendResetEmail(user?.email ?? ''); setMsg({ ok: true, text: t('reset_sent') }); })}
+                className="w-full h-12 rounded-xl border-2 border-indigo-300 text-indigo-800 text-base font-bold">{t('send_reset')}</button>
+              <button onClick={async () => { await logout(); navigate('/login'); }}
+                className="w-full h-12 rounded-xl border-2 border-slate-200 text-rose-700 text-base font-bold flex items-center justify-center gap-2"><LogOut className="w-5 h-5" /> {t('logout')}</button>
+            </div>
+          )}
+
+          {/* 6. App preferences (§12.8) — apply immediately on this device and are saved to the shop */}
+          {section === 'prefs' && (
+            <div className="space-y-4">
+              {info(t('currency'), 'INR (₹)')}
+              {info(t('time_zone'), 'Asia/Kolkata (IST)')}
+              <label className={lbl}>{t('language')}
+                <select value={lang} onChange={e => { setLang(e.target.value as Lang); savePrefs({ language: e.target.value }); }} className={`${field} mt-1`}>
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+              </label>
+              <label className={lbl}>{t('date_display')}
+                <select value={dateFormat} onChange={e => { setDateFormat(e.target.value as DateFormat); savePrefs({ date_format: e.target.value }); }} className={`${field} mt-1`}>
+                  {DATE_FORMATS.map(f => <option key={f} value={f}>{f} · {formatDate('2026-11-07', f)}</option>)}
+                </select>
+              </label>
+              <label className={lbl}>{t('theme')}
+                <select value={theme} onChange={e => { setTheme(e.target.value as Theme); savePrefs({ theme: e.target.value as Theme }); }} className={`${field} mt-1`}>
+                  <option value="light">{t('theme_light')}</option><option value="dark">{t('theme_dark')}</option><option value="system">{t('theme_system')}</option>
+                </select>
+              </label>
+              <label className={lbl}>{t('landing_page')}
+                <select value={landing} onChange={e => { setLanding(e.target.value); savePrefs({ default_landing_page: e.target.value }); }} className={`${field} mt-1`}>
+                  {LANDING_PAGES.map(p => <option key={p} value={p}>{t(({ '/dashboard': 'nav_home', '/ledger': 'nav_ledger', '/dues': 'nav_dues', '/history': 'nav_history', '/parties': 'nav_parties' } as const)[p])}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {/* 7. Data & backup (§12.9) */}
+          {section === 'backup' && (
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-2">
+                <button onClick={() => exportCsv('transactions')} className="h-12 rounded-xl bg-indigo-700 text-white text-base font-bold flex items-center justify-center gap-2"><Download className="w-5 h-5" /> {t('export_transactions')}</button>
+                <button onClick={() => exportCsv('parties')} className="h-12 rounded-xl bg-indigo-700 text-white text-base font-bold flex items-center justify-center gap-2"><Download className="w-5 h-5" /> {t('export_parties')}</button>
+              </div>
+              <button onClick={() => navigate('/reports')} className="w-full h-12 rounded-xl border-2 border-slate-200 text-base font-semibold">{t('open_reports_export')}</button>
+              <p className="p-3 rounded-xl bg-amber-50 text-base text-amber-900">{t('backup_info')}</p>
+              <p className="text-base text-slate-700">{t('privacy_info')}</p>
+              <p className="text-base text-slate-700">{t('retention_info')}</p>
+            </div>
+          )}
+
+          {/* 8. About (§12.10) */}
+          {section === 'about' && (
+            <div className="space-y-4">
+              {info('YorLedger', t('tagline'))}
+              {info(t('version'), APP_VERSION)}
+              {info(t('developer'), 'YorLedger')}
+              <section><h3 className="text-base font-bold text-slate-900">{t('terms_title')}</h3><p className="text-base text-slate-700">{t('terms_body')}</p></section>
+              <section><h3 className="text-base font-bold text-slate-900">{t('privacy_title')}</h3><p className="text-base text-slate-700">{t('privacy_info')}</p></section>
+              <section>
+                <h3 className="text-base font-bold text-slate-900">{t('help_support')}</h3>
+                <a href={`${REPO}/issues`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex h-12 px-4 rounded-xl border-2 border-slate-200 text-base font-semibold items-center">{t('report_problem')}</a>
+              </section>
+              <p className="text-sm text-slate-500">{t('decision_APPROVED')}: {fmtDate(shop?.verified_at?.slice(0, 10))}</p>
+            </div>
+          )}
         </div>
       </div>
-    </DashboardLayout>
+    </div>
   );
 };

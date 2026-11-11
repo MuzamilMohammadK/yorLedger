@@ -22,7 +22,7 @@ const BADGE: Record<string, string> = {
  * Partial / Overdue are display labels only; overdue needs a due (reminder) date in the past.
  */
 export const DuesPage: React.FC = () => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const { shop } = useAuth();
   const shell = useShell();
   const navigate = useNavigate();
@@ -157,7 +157,7 @@ export const DuesPage: React.FC = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-lg font-bold text-slate-900 truncate">{b.party_name}</p>
-                    <p className="text-sm text-slate-600">{t(`kind_${b.type}` as any)} · #{b.invoice_number} · {b.invoice_date}{b.due_date ? ` · ${t('due_date')} ${b.due_date}` : ''}</p>
+                    <p className="text-sm text-slate-600">{t(`kind_${b.type}` as any)} · #{b.invoice_number} · {fmtDate(b.invoice_date)}{b.due_date ? ` · ${t('due_date')} ${fmtDate(b.due_date)}` : ''}</p>
                   </div>
                   <span className={`shrink-0 px-2 py-1 rounded-full text-sm font-bold ${BADGE[st]}`}>{t(`status_${st}` as any)}</span>
                 </div>

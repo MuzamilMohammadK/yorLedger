@@ -15,7 +15,7 @@ const FILTERS = ['ALL', 'CUSTOMER', 'SUPPLIER', 'ARTISAN'] as const;
 
 /** §7 Parties: list, search, type filter, join-date calendar, details and actions. */
 export const PartiesPage: React.FC = () => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const shell = useShell();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -107,7 +107,7 @@ export const PartiesPage: React.FC = () => {
       </div>
 
       {(showCal || day) && <JoinDateCalendar counts={joinCounts} selected={day} onSelect={setDay} />}
-      {day && <p className="text-base font-semibold text-indigo-800">{t('parties_on', { date: day })}</p>}
+      {day && <p className="text-base font-semibold text-indigo-800">{t('parties_on', { date: fmtDate(day) })}</p>}
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTERS.map(f => (
@@ -137,7 +137,7 @@ export const PartiesPage: React.FC = () => {
               <p className="text-lg font-bold text-slate-900">{p.name}</p>
               <p className="text-sm text-slate-600">{t(`type_${p.type}` as any)} · {p.owner_name} · {p.phone}</p>
               <p className="text-sm text-slate-500">
-                {p.gstin ? <span className="font-mono">{p.gstin}</span> : '—'} · {getStateByCode(p.state_code)?.name ?? p.state ?? '—'} · {t('joined_date')} {p.joined_on}
+                {p.gstin ? <span className="font-mono">{p.gstin}</span> : '—'} · {getStateByCode(p.state_code)?.name ?? p.state ?? '—'} · {t('joined_date')} {fmtDate(p.joined_on)}
               </p>
               {balance(p)}
             </button>
@@ -171,7 +171,7 @@ export const PartiesPage: React.FC = () => {
                   <td className="px-3 py-3 text-base font-mono whitespace-nowrap">{p.gstin ?? '—'}</td>
                   <td className="px-3 py-3 text-base">{getStateByCode(p.state_code)?.name ?? p.state ?? '—'}</td>
                   <td className="px-3 py-3">{balance(p)}</td>
-                  <td className="px-3 py-3 text-base whitespace-nowrap">{p.joined_on}</td>
+                  <td className="px-3 py-3 text-base whitespace-nowrap">{fmtDate(p.joined_on)}</td>
                 </tr>
               ))}
             </tbody>
@@ -189,7 +189,7 @@ export const PartiesPage: React.FC = () => {
               <p>{t('state')}: {getStateByCode(viewing.state_code)?.name ?? viewing.state ?? '—'}</p>
               {viewing.address && <p>{t('address')}: {viewing.address}{viewing.pin_code ? ` – ${viewing.pin_code}` : ''}</p>}
               {viewing.notes && <p>{t('notes')}: {viewing.notes}</p>}
-              <p>{t('joined_date')}: {viewing.joined_on}</p>
+              <p>{t('joined_date')}: {fmtDate(viewing.joined_on)}</p>
               {balance(viewing)}
             </div>
             <div className="grid grid-cols-2 gap-2">

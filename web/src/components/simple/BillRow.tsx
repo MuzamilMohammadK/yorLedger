@@ -37,7 +37,7 @@ const BADGE: Record<string, string> = {
 
 /** One bill / payment / return line, large and tappable. */
 export const BillRow: React.FC<{ bill: BillRowData; onClick?: () => void; right?: React.ReactNode }> = ({ bill, onClick, right }) => {
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const Icon = ICON[bill.type] ?? ShoppingBag;
   const isBill = ['SALE', 'PURCHASE', 'JOB_WORK'].includes(bill.type);
   const st = statusOf(bill);
@@ -50,7 +50,7 @@ export const BillRow: React.FC<{ bill: BillRowData; onClick?: () => void; right?
         <span className="min-w-0 flex-1">
           <span className="block text-base font-bold text-slate-900 truncate">{bill.party_name}</span>
           <span className="block text-sm text-slate-500 truncate">
-            {t(`kind_${bill.type}` as any)} · #{bill.invoice_number} · {bill.invoice_date}
+            {t(`kind_${bill.type}` as any)} · #{bill.invoice_number} · {fmtDate(bill.invoice_date)}
           </span>
         </span>
         <span className="text-right shrink-0">

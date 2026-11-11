@@ -3,6 +3,8 @@
 import type { Shop, Transaction } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { isAndroidApp, isDesktopApp, shareFile } from './platform';
+import { api } from './api';
+import { formatDate } from '../i18n';
 
 const TITLE: Record<string, string> = { SALE: 'TAX INVOICE', PURCHASE: 'PURCHASE BILL', JOB_WORK: 'JOB WORK BILL' };
 
@@ -16,26 +18,36 @@ function money(paise: number): string {
   return `${neg ? '-' : ''}Rs. ${rest ? `${rest},${last3}` : last3}.${f}`;
 }
 
-function dmy(iso: string) {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
+const INVOICE_DATE_FORMATS = ['DD/MM/YYYY', 'DD-MMM-YYYY', 'YYYY-MM-DD'] as const;
 
 export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob> {
   const { jsPDF } = await import('jspdf');
+  // §12.5 invoice settings: prefix, date format, logo, GSTIN, tax breakdown, footer, terms.
+  const inv = (await api.getShopSettings().catch(() => null))?.invoice_settings;
+  const fmt = INVOICE_DATE_FORMATS.includes(inv?.date_format as any) ? (inv!.date_format as typeof INVOICE_DATE_FORMATS[number]) : 'DD/MM/YYYY';
+  const dmy = (iso: string) => formatDate(iso, fmt);
+  const showGstin = inv?.show_gstin ?? true;
+  const billNo = `${inv?.invoice_prefix ?? ''}${bill.invoice_number}`;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, L = 14, R = W - 14;
   const party = cache.rawParty(bill.party_id);
   let y = 16;
 
   // Header: our shop for a sale; for purchases the bill is our own record of it.
-  doc.setFont('helvetica', 'bold').setFontSize(16).text(shop.name, L, y);
+  let nameX = L;
+  if (inv?.show_logo && inv.logo_data_url) {
+    try {
+      doc.addImage(inv.logo_data_url, L, 8, 16, 16);
+      nameX = L + 19;
+    } catch { /* unreadable logo: print without it */ }
+  }
+  doc.setFont('helvetica', 'bold').setFontSize(16).text(shop.name, nameX, y);
   doc.setFontSize(12).text(TITLE[bill.type] ?? 'BILL', R, y, { align: 'right' });
   doc.setFont('helvetica', 'normal').setFontSize(9);
   y += 6;
-  doc.splitTextToSize(shop.address || '', 110).forEach((line: string) => { doc.text(line, L, y); y += 4.5; });
-  doc.text(`GSTIN: ${shop.gstin}   Ph: ${shop.phone}`, L, y);
-  doc.text(`Bill No: ${bill.invoice_number}`, R, 22, { align: 'right' });
+  doc.splitTextToSize(shop.address || '', 110).forEach((line: string) => { doc.text(line, nameX, y); y += 4.5; });
+  doc.text(showGstin ? `GSTIN: ${shop.gstin}   Ph: ${shop.phone}` : `Ph: ${shop.phone}`, nameX, y);
+  doc.text(`Bill No: ${billNo}`, R, 22, { align: 'right' });
   doc.text(`Date: ${dmy(bill.invoice_date)}`, R, 27, { align: 'right' });
   y += 7;
   doc.setDrawColor(180).line(L, y, R, y);
@@ -49,7 +61,7 @@ export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob>
   y += 4.5;
   doc.setFontSize(9);
   if (party?.address) doc.splitTextToSize(String(party.address), 120).forEach((line: string) => { doc.text(line, L, y); y += 4.5; });
-  const contact = [party?.gstin ? `GSTIN: ${party.gstin}` : '', party?.phone ? `Ph: ${party.phone}` : ''].filter(Boolean).join('   ');
+  const contact = [showGstin && party?.gstin ? `GSTIN: ${party.gstin}` : '', party?.phone ? `Ph: ${party.phone}` : ''].filter(Boolean).join('   ');
   if (contact) { doc.text(contact, L, y); y += 4.5; }
   y += 4;
 
@@ -81,7 +93,8 @@ export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob>
   // Totals
   const pct = ((bill.items?.[0]?.gst_rate_bp ?? 0) / 100).toString();
   const rows: [string, string, boolean?][] = [['Taxable value', money(bill.subtotal_paise)]];
-  if (bill.igst_paise > 0) rows.push([`IGST @ ${pct}%`, money(bill.igst_paise)]);
+  if (inv && !inv.show_tax_breakdown) rows.push([`GST @ ${pct}%`, money(bill.cgst_paise + bill.sgst_paise + bill.igst_paise)]);
+  else if (bill.igst_paise > 0) rows.push([`IGST @ ${pct}%`, money(bill.igst_paise)]);
   else rows.push([`CGST @ ${Number(pct) / 2}%`, money(bill.cgst_paise)], [`SGST @ ${Number(pct) / 2}%`, money(bill.sgst_paise)]);
   rows.push(['Bill total', money(bill.grand_total_paise), true]);
   if ((bill.return_paise ?? 0) > 0) rows.push(['Less: returns', money(-(bill.return_paise ?? 0))]);
@@ -95,7 +108,17 @@ export async function buildBillPdf(shop: Shop, bill: Transaction): Promise<Blob>
     y += bold ? 7 : 5.5;
   }
 
-  doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(120);
+  // Footer text and terms (§12.5).
+  y += 4;
+  doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(60);
+  for (const block of [inv?.terms_and_conditions, inv?.invoice_footer]) {
+    if (!block?.trim()) continue;
+    const lines: string[] = doc.splitTextToSize(block.trim(), R - L);
+    if (y + lines.length * 4.2 > 282) { doc.addPage(); y = 20; }
+    doc.text(lines, L, y);
+    y += lines.length * 4.2 + 3;
+  }
+  doc.setFontSize(8).setTextColor(120);
   doc.text('Computer generated bill. Made with YorLedger.', W / 2, 288, { align: 'center' });
   return doc.output('blob');
 }
