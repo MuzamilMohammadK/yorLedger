@@ -50,8 +50,11 @@ export interface RegisterShopPayload {
   email: string;
   address: string;
   state_code: string;
+  pin_code?: string;
   default_gst_bp: number; // e.g. 500 for 5%
-  document_url?: string | null; // JPEG/JPG document data URL or link
+  documents?: ShopDocumentUpload[];
+  /** @deprecated single-document upload; use documents */
+  document_url?: string | null;
   document_name?: string | null;
 }
 
@@ -62,7 +65,11 @@ export interface ResubmitShopPayload {
   mobile?: string;
   address?: string;
   state_code?: string;
+  pin_code?: string;
   default_gst_bp?: number;
+  documents?: ShopDocumentUpload[];
+  removed_documents?: ShopDocumentType[];
+  /** @deprecated single-document upload; use documents */
   document_url?: string | null;
   document_name?: string | null;
 }
@@ -601,3 +608,23 @@ export interface ReturnPayload {
   lines: { index: number; qty: number }[];
   reason?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// §4.6 Shop verification documents (stored privately; owner + admin only).
+// ---------------------------------------------------------------------------
+export type ShopDocumentType = 'GST_CERTIFICATE' | 'ADDRESS_PROOF' | 'OWNERSHIP_PROOF' | 'SHOP_FRONT_PHOTO';
+export const SHOP_DOCUMENT_TYPES: ShopDocumentType[] = ['GST_CERTIFICATE', 'ADDRESS_PROOF', 'OWNERSHIP_PROOF', 'SHOP_FRONT_PHOTO'];
+/** Product decision (spec says confirm): GST certificate is mandatory, the rest optional. */
+export const REQUIRED_SHOP_DOCUMENTS: ShopDocumentType[] = ['GST_CERTIFICATE'];
+
+export interface ShopDocument {
+  type: ShopDocumentType;
+  data_url: string;          // compressed JPEG data URL
+  file_name: string;
+  uploaded_at: string;
+  verification_status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  admin_comment: string | null;
+}
+
+/** New document chosen in the form, not yet saved. */
+export interface ShopDocumentUpload { type: ShopDocumentType; data_url: string; file_name: string }

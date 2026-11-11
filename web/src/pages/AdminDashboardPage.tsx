@@ -1,440 +1,248 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCircle2, XCircle, Clock, Search, LogOut, Loader2, ShieldCheck, X } from 'lucide-react';
+import { Shop, ShopDocument, ShopVerification, getStateByCode } from '@yorbalance/shared';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { Shop } from '@yorbalance/shared';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
-import { Alert } from '../components/ui/Alert';
-import {
-  ShieldCheck,
-  Check,
-  X,
-  Search,
-  RefreshCw,
-  Store,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  FileText,
-  Calendar,
-  AlertCircle,
-  Image as ImageIcon,
-  ExternalLink,
-  Eye,
-  CheckCircle2
-} from 'lucide-react';
+import type { AdminNotification } from '../lib/data/session';
 
+type Filter = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL';
+const DOC_LABEL: Record<string, string> = {
+  GST_CERTIFICATE: 'GST registration certificate', ADDRESS_PROOF: 'Shop address proof',
+  OWNERSHIP_PROOF: 'Ownership / constitution proof', SHOP_FRONT_PHOTO: 'Shop front photo'
+};
+const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—');
+
+/** §4 Admin review: queue of shops, per-document review, approve / reject with reason, audit history. */
 export const AdminDashboardPage: React.FC = () => {
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [rejectingShop, setRejectingShop] = useState<Shop | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [rejectError, setRejectError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [viewingDocShop, setViewingDocShop] = useState<Shop | null>(null);
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<Filter>('PENDING');
+  const [q, setQ] = useState('');
+  const [shops, setShops] = useState<Shop[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [inbox, setInbox] = useState<AdminNotification[]>([]);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const seen = useRef<Set<string> | null>(null);
 
-  const fetchShops = async () => {
+  const load = useCallback(async () => {
+    setError(null);
     try {
-      setLoading(true);
-      const filter = statusFilter === 'ALL' ? undefined : statusFilter;
-      const res = await api.getAdminShops(filter);
-      setShops(res?.shops || []);
-    } catch (err: any) {
-      console.error('Failed to load admin shops:', err);
-    } finally {
-      setLoading(false);
+      setShops((await api.getAdminShops(filter)).shops);
+    } catch (e: any) {
+      setError(e.message);
+      setShops([]);
     }
-  };
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    fetchShops();
-  }, [statusFilter]);
-
-  const handleApprove = async (shop: Shop) => {
-    if (!window.confirm(`Confirm approval for "${shop.name}" (GSTIN: ${shop.gstin})? This will grant full dashboard and ledger access.`)) {
-      return;
+  // Live inbox; a system notification for new registrations while this page is open (no server push on Spark).
+  useEffect(() => api.watchAdminNotifications(items => {
+    setInbox(items);
+    if (seen.current) {
+      const fresh = items.filter(i => !i.read && !seen.current!.has(i.id));
+      if (fresh.length) {
+        load();
+        if ('Notification' in window && Notification.permission === 'granted') {
+          fresh.forEach(i => new Notification('YorLedger admin', { body: `${i.kind === 'SHOP_REGISTERED' ? 'New shop' : 'Resubmitted'}: ${i.shop_name}` }));
+        }
+      }
     }
+    seen.current = new Set(items.map(i => i.id));
+  }), [load]);
+  useEffect(() => { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); }, []);
 
-    try {
-      setActionLoading(shop.id);
-      await api.recordAdminDecision(shop.id, { decision: 'APPROVED' });
-      setActionSuccess(`Shop "${shop.name}" approved successfully! Owner access is now active.`);
-      await fetchShops();
-    } catch (err: any) {
-      alert(err.message || 'Approval action failed');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleConfirmReject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectingShop) return;
-
-    if (!rejectReason.trim()) {
-      setRejectError('Please state the specific reason for rejecting this shop registration.');
-      return;
-    }
-
-    try {
-      setActionLoading(rejectingShop.id);
-      await api.recordAdminDecision(rejectingShop.id, {
-        decision: 'REJECTED',
-        reason: rejectReason.trim()
-      });
-      setActionSuccess(`Shop "${rejectingShop.name}" has been rejected. Owner notified to correct details.`);
-      setRejectingShop(null);
-      setRejectReason('');
-      setRejectError(null);
-      await fetchShops();
-    } catch (err: any) {
-      setRejectError(err.message || 'Rejection action failed');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const filteredShops = shops.filter(s => {
-    const q = searchQuery.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      s.owner_name.toLowerCase().includes(q) ||
-      s.gstin.toLowerCase().includes(q) ||
-      s.email.toLowerCase().includes(q)
-    );
+  const unread = inbox.filter(i => !i.read).length;
+  const list = (shops ?? []).filter(s => {
+    const n = q.trim().toLowerCase();
+    return !n || s.name.toLowerCase().includes(n) || s.gstin.toLowerCase().includes(n) || s.owner_name.toLowerCase().includes(n) || s.phone.includes(n);
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Top Header */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">Merchant Verification & Approval Console</h1>
-              <p className="text-sm text-slate-500">
-                Review submitted business details, verify uploaded JPEG documents, and manage approval status
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchShops}
-              isLoading={loading}
-              className="gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Refresh Queue
-            </Button>
-          </div>
+    <div className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-16 px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-indigo-700" /><span className="text-lg font-bold">YorLedger Admin</span></div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-sm text-slate-500">{user?.email}</span>
+          <button onClick={() => setInboxOpen(true)} aria-label="Notifications" className="relative w-12 h-12 rounded-full hover:bg-slate-100 flex items-center justify-center">
+            <Bell className="w-6 h-6" />
+            {unread > 0 && <span className="absolute top-1 right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center">{unread}</span>}
+          </button>
+          <button onClick={async () => { await logout(); navigate('/admin-login'); }} className="h-11 px-3 rounded-xl border-2 border-slate-200 text-base font-semibold text-rose-700 flex items-center gap-2">
+            <LogOut className="w-5 h-5" /> Sign out
+          </button>
         </div>
+      </header>
 
-        {actionSuccess && (
-          <Alert type="success" message={actionSuccess} className="mb-6" />
-        )}
-
-        {/* Filters and Search Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between items-center">
-          <div className="flex rounded-xl bg-white border border-slate-200 p-1 w-full sm:w-auto shadow-sm">
-            {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setStatusFilter(tab)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                  statusFilter === tab
-                    ? 'bg-slate-900 text-white shadow'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                {tab === 'PENDING' ? 'Pending Approval' : tab}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by shop, owner, GSTIN..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-800"
-            />
-          </div>
+      <main className="max-w-5xl mx-auto p-4 space-y-4">
+        <h1 className="text-2xl font-bold">Shop verification</h1>
+        <div className="flex gap-2 overflow-x-auto">
+          {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as Filter[]).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`h-11 px-4 shrink-0 rounded-full text-base font-semibold ${filter === f ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200'}`}>
+              {f === 'ALL' ? 'All' : f[0] + f.slice(1).toLowerCase()}
+            </button>
+          ))}
         </div>
-
-        {/* Shops Queue */}
-        {loading ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
-            <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider">
-              Loading merchant applications...
-            </p>
-          </div>
-        ) : filteredShops.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-3">
-              <Store className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 mb-1">No Applications Found</h3>
-            <p className="text-sm text-slate-500">
-              There are currently no shop registrations matching this filter.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filteredShops.map(s => (
-              <div
-                key={s.id}
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 hover:shadow-md transition-shadow flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-base text-slate-900">{s.name}</h3>
-                        <Badge status={s.status} />
-                      </div>
-                      <span className="text-sm text-slate-500 font-medium">
-                        Proprietor: <strong>{s.owner_name}</strong>
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">
-                        State Code
-                      </span>
-                      <span className="text-sm font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">
-                        {s.state_code}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Details box */}
-                  <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 text-sm border border-slate-100 my-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" /> GSTIN:
-                      </span>
-                      <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {s.gstin}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5" /> Mobile:
-                      </span>
-                      <span className="text-slate-800 font-semibold">{s.phone}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5" /> Email:
-                      </span>
-                      <span className="text-slate-800">{s.email}</span>
-                    </div>
-
-                    <div className="flex items-start justify-between gap-2 pt-1 border-t border-slate-200/60">
-                      <span className="text-slate-500 flex items-center gap-1.5 flex-shrink-0">
-                        <MapPin className="w-3.5 h-3.5" /> Address:
-                      </span>
-                      <span className="text-right text-slate-700">{s.address}</span>
-                    </div>
-
-                    {/* Uploaded Document Preview Item */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <ImageIcon className="w-3.5 h-3.5 text-brand-900" /> Verification Doc:
-                      </span>
-                      {s.document_url ? (
-                        <button
-                          type="button"
-                          onClick={() => setViewingDocShop(s)}
-                          className="text-sm font-semibold text-brand-900 hover:text-brand-950 flex items-center gap-1 bg-brand-50 px-2 py-0.5 rounded border border-brand-200"
-                        >
-                          <Eye className="w-3 h-3" /> Verify Document
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 italic">No document</span>
-                      )}
-                    </div>
-                  </div>
+        <div className="relative">
+          <Search className="w-5 h-5 absolute left-3 top-3.5 text-slate-400" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search shop, GSTIN, owner or phone"
+            className="w-full h-12 pl-10 pr-3 rounded-xl border-2 border-slate-200 bg-white text-base focus:border-indigo-600 focus:outline-none" />
+        </div>
+        {error && <p className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">{error}</p>}
+        {shops === null && <p className="py-8 text-center text-slate-500">Loading…</p>}
+        {shops && !list.length && <p className="py-8 text-center text-slate-500">No shops here.</p>}
+        <div className="space-y-2">
+          {list.map(s => (
+            <button key={s.id} onClick={() => setOpenId(s.id)} className="w-full text-left p-4 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-lg font-bold truncate">{s.name}</p>
+                  <p className="text-sm text-slate-600">{s.owner_name} · {s.phone} · <span className="font-mono">{s.gstin}</span></p>
+                  <p className="text-sm text-slate-500">Submitted {fmt(s.updated_at)}</p>
                 </div>
-
-                {/* Card Actions */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-sm text-slate-400 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Submitted: {new Date(s.created_at).toLocaleDateString()}
-                  </span>
-
-                  {s.status === 'PENDING' && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => {
-                          setRejectingShop(s);
-                          setRejectReason('');
-                          setRejectError(null);
-                        }}
-                        className="gap-1 px-3"
-                      >
-                        <X className="w-3.5 h-3.5" /> Reject
-                      </Button>
-
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        isLoading={actionLoading === s.id}
-                        onClick={() => handleApprove(s)}
-                        className="gap-1 bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500 px-3"
-                      >
-                        <Check className="w-3.5 h-3.5" /> Approve
-                      </Button>
-                    </div>
-                  )}
-
-                  {s.status !== 'PENDING' && (
-                    <div className="text-right">
-                      <span className="text-sm text-slate-500 block">
-                        Verified by: <strong>{s.verified_by || 'Admin'}</strong>
-                      </span>
-                      <span className="text-sm text-slate-400">
-                        {s.verified_at ? new Date(s.verified_at).toLocaleDateString() : ''}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <StatusPill status={s.status} />
               </div>
-            ))}
-          </div>
-        )}
+            </button>
+          ))}
+        </div>
+      </main>
 
-        {/* Document Verification Modal */}
-        {viewingDocShop && (
-          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200">
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5 text-brand-900" />
-                    Document Verification: {viewingDocShop.name}
-                  </h3>
-                  <span className="text-sm text-slate-500">
-                    Proprietor: {viewingDocShop.owner_name} • GSTIN: {viewingDocShop.gstin}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setViewingDocShop(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {inboxOpen && (
+        <Panel title="Notifications" onClose={() => setInboxOpen(false)}>
+          {!inbox.length && <p className="py-8 text-center text-slate-500">No notifications</p>}
+          {inbox.map(n => (
+            <button key={n.id} onClick={() => { api.markAdminNotificationRead(n.id); setInboxOpen(false); setOpenId(n.shop_id); }}
+              className={`w-full text-left p-3 mb-2 rounded-xl border-2 ${n.read ? 'border-slate-200' : 'border-indigo-300 bg-indigo-50'}`}>
+              <p className="text-base font-semibold">{n.kind === 'SHOP_REGISTERED' ? 'New shop registered' : 'Shop resubmitted after rejection'}: {n.shop_name}</p>
+              <p className="text-sm text-slate-500">{fmt(n.created_at)}</p>
+            </button>
+          ))}
+        </Panel>
+      )}
 
-              <div className="max-h-[60vh] overflow-auto rounded-2xl border border-slate-200 bg-slate-900/5 flex items-center justify-center p-4">
-                {viewingDocShop.document_url ? (
-                  <img
-                    src={viewingDocShop.document_url}
-                    alt="Submitted Verification Document"
-                    className="max-w-full max-h-[55vh] object-contain rounded-lg shadow-sm"
-                  />
-                ) : (
-                  <p className="text-sm text-slate-500">No document image available</p>
-                )}
-              </div>
-
-              <div className="mt-5 flex items-center justify-between pt-3 border-t border-slate-100">
-                <span className="text-sm font-semibold text-emerald-700 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" /> JPEG/JPG Document Received
-                </span>
-
-                <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setViewingDocShop(null)}>
-                    Close
-                  </Button>
-                  {viewingDocShop.status === 'PENDING' && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => {
-                        const target = viewingDocShop;
-                        setViewingDocShop(null);
-                        handleApprove(target);
-                      }}
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" /> Approve Shop
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reject Modal */}
-        {rejectingShop && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-              <div className="flex items-center gap-3 text-rose-600 mb-4">
-                <AlertCircle className="w-6 h-6" />
-                <h3 className="text-lg font-bold text-slate-900">Reject Shop Registration</h3>
-              </div>
-
-              <p className="text-sm text-slate-600 mb-4">
-                Please specify the reason for rejecting <strong>{rejectingShop.name}</strong> (GSTIN: {rejectingShop.gstin}). This explanation will be displayed to the merchant so they can correct their details and resubmit.
-              </p>
-
-              {rejectError && <Alert type="error" message={rejectError} className="mb-4" />}
-
-              <form onSubmit={handleConfirmReject} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Rejection Reason
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={rejectReason}
-                    onChange={e => setRejectReason(e.target.value)}
-                    placeholder="e.g. Uploaded document is illegible; GSTIN does not match proprietor name."
-                    className="w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                    required
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRejectingShop(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="danger"
-                    size="sm"
-                    isLoading={actionLoading === rejectingShop.id}
-                  >
-                    Confirm Rejection
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+      {openId && <ShopReview shopId={openId} onClose={() => setOpenId(null)} onChanged={load} />}
     </div>
+  );
+};
+
+const StatusPill: React.FC<{ status: string }> = ({ status }) => {
+  const m: Record<string, string> = { PENDING: 'bg-amber-100 text-amber-900', APPROVED: 'bg-emerald-100 text-emerald-800', REJECTED: 'bg-rose-100 text-rose-800' };
+  return <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold ${m[status] ?? ''}`}>{status}</span>;
+};
+
+const Panel: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
+  <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-end sm:items-center justify-center">
+    <div role="dialog" aria-modal="true" aria-label={title} className="w-full sm:max-w-2xl max-h-[100dvh] sm:max-h-[92vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl">
+      <div className="sticky top-0 bg-white border-b border-slate-200 h-16 px-4 flex items-center justify-between z-10">
+        <h2 className="text-xl font-bold">{title}</h2>
+        <button onClick={onClose} aria-label="Close" className="w-12 h-12 rounded-full hover:bg-slate-100 flex items-center justify-center"><X className="w-6 h-6" /></button>
+      </div>
+      <div className="p-4 sm:p-6">{children}</div>
+    </div>
+  </div>
+);
+
+const ShopReview: React.FC<{ shopId: string; onClose: () => void; onChanged: () => void }> = ({ shopId, onClose, onChanged }) => {
+  const [data, setData] = useState<{ shop: Shop; documents: ShopDocument[]; history: ShopVerification[] } | null>(null);
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    try {
+      const d = await api.getAdminShopDetails(shopId) as any;
+      setData(d);
+      setComments(Object.fromEntries(d.documents.map((x: ShopDocument) => [x.type, x.admin_comment ?? ''])));
+    } catch (e: any) { setError(e.message); }
+  }, [shopId]);
+  useEffect(() => { reload(); }, [reload]);
+
+  const run = async (key: string, fn: () => Promise<unknown>) => {
+    setBusy(key);
+    setError(null);
+    try { await fn(); await reload(); onChanged(); } catch (e: any) { setError(e.message); } finally { setBusy(null); }
+  };
+
+  if (!data) return <Panel title="Shop" onClose={onClose}>{error ? <p className="text-rose-700">{error}</p> : <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-400" />}</Panel>;
+  const { shop, documents, history } = data;
+  const row = (l: string, v?: string | null) => <div className="flex justify-between gap-4 py-2 border-b border-slate-100"><span className="text-slate-500">{l}</span><span className="font-semibold text-right break-all">{v || '—'}</span></div>;
+  const ST = { PENDING: Clock, APPROVED: CheckCircle2, REJECTED: XCircle } as const;
+
+  return (
+    <Panel title={shop.name} onClose={onClose}>
+      <div className="space-y-5">
+        <div className="flex items-center justify-between"><StatusPill status={shop.status} /><span className="text-sm text-slate-500">Registered {fmt(shop.created_at)}</span></div>
+        {error && <p className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">{error}</p>}
+        <section>
+          {row('Owner', shop.owner_name)}{row('GSTIN', shop.gstin)}{row('State', `${getStateByCode(shop.state_code)?.name ?? ''} (${shop.state_code})`)}
+          {row('Mobile', shop.phone)}{row('Email', shop.email)}{row('Address', shop.address)}{row('PIN', shop.pin_code)}
+          {row('Default GST', `${shop.default_gst_bp / 100}%`)}
+        </section>
+
+        <section>
+          <h3 className="text-lg font-bold mb-2">Documents</h3>
+          {!documents.length && <p className="text-slate-500">No documents uploaded.</p>}
+          <div className="space-y-3">
+            {documents.map(d => {
+              const I = ST[d.verification_status];
+              return (
+                <div key={d.type} className="p-3 rounded-2xl border-2 border-slate-200">
+                  <div className="flex gap-3">
+                    <button onClick={() => setZoom(d.data_url)} className="w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-slate-100">
+                      <img src={d.data_url} alt={DOC_LABEL[d.type]} className="w-full h-full object-cover" />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-bold">{DOC_LABEL[d.type]}</p>
+                      <p className="text-sm text-slate-500 truncate">{d.file_name} · {fmt(d.uploaded_at)}</p>
+                      <p className="text-sm font-semibold flex items-center gap-1"><I className="w-4 h-4" /> {d.verification_status}</p>
+                    </div>
+                  </div>
+                  <input value={comments[d.type] ?? ''} onChange={e => setComments({ ...comments, [d.type]: e.target.value })}
+                    placeholder="Comment (required to reject)" className="mt-2 w-full h-11 px-3 rounded-xl border-2 border-slate-200 text-base" />
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button disabled={!!busy} onClick={() => run(`a-${d.type}`, () => api.adminReviewDocument(shop.id, d.type, 'APPROVED', comments[d.type] || null))}
+                      className="h-11 rounded-xl bg-emerald-700 text-white font-bold disabled:opacity-60">Approve</button>
+                    <button disabled={!!busy} onClick={() => run(`r-${d.type}`, () => api.adminReviewDocument(shop.id, d.type, 'REJECTED', comments[d.type] || null))}
+                      className="h-11 rounded-xl border-2 border-rose-300 text-rose-700 font-bold disabled:opacity-60">Reject</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-lg font-bold">Decision</h3>
+          <textarea rows={2} value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason (required to reject; shown to the shop owner)"
+            className="w-full px-3 py-2 rounded-xl border-2 border-slate-200 text-base" />
+          <div className="grid grid-cols-2 gap-2">
+            <button disabled={!!busy} onClick={() => run('approve', () => api.recordAdminDecision(shop.id, { decision: 'APPROVED', reason: reason || undefined }))}
+              className="h-14 rounded-2xl bg-emerald-700 text-white text-lg font-bold disabled:opacity-60">{busy === 'approve' ? '…' : 'Approve shop'}</button>
+            <button disabled={!!busy} onClick={() => run('reject', () => api.recordAdminDecision(shop.id, { decision: 'REJECTED', reason }))}
+              className="h-14 rounded-2xl bg-rose-700 text-white text-lg font-bold disabled:opacity-60">{busy === 'reject' ? '…' : 'Reject shop'}</button>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-bold mb-2">Review history</h3>
+          {!history.length && <p className="text-slate-500">No decisions yet.</p>}
+          {history.map(h => (
+            <div key={h.id} className="py-2 border-b border-slate-100">
+              <p className="font-semibold">{h.decision} · {fmt(h.decided_at)} · {h.decided_by}</p>
+              {h.reason && <p className="text-slate-700">{h.reason}</p>}
+            </div>
+          ))}
+        </section>
+      </div>
+      {zoom && (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="Document" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+    </Panel>
   );
 };

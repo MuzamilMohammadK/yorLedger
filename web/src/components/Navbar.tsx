@@ -22,7 +22,7 @@ export const Navbar: React.FC = () => {
     '/settings'
   ].some(p => location.pathname === p || location.pathname.startsWith(`${p}/`));
 
-  if (isDashboardRoute && shop?.status === 'APPROVED') {
+  if ((isDashboardRoute && shop?.status === 'APPROVED') || location.pathname === '/admin') {
     return null;
   }
 

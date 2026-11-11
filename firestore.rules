@@ -63,6 +63,18 @@ service cloud.firestore {
       }
     }
 
+    // ---------- admin inbox (§16: shop registered / resubmitted) ----------
+    match /adminNotifications/{id} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.kind in ['SHOP_REGISTERED', 'SHOP_RESUBMITTED']
+        && request.resource.data.owner_uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.shop_id)).data.owner_uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['kind', 'shop_id', 'shop_name', 'owner_uid', 'read_at', 'created_at']);
+      allow update: if isAdmin() && onlyChanges(['read_at']);
+      allow delete: if false;
+    }
+
     // ---------- shops ----------
     match /shops/{shopId} {
       allow get: if ownsShop(shopId) || isAdmin();
@@ -91,13 +103,22 @@ service cloud.firestore {
           && request.resource.data.default_gst_bp >= 0 && request.resource.data.default_gst_bp <= 2800);
       allow delete: if false;
 
-      // Verification document (compressed JPEG data URL). Private: owner + admin only.
-      match /private/{docId} {
+      // §4.6 verification documents (compressed JPEG data URLs). Private: owner + admin only.
+      // getAfter: documents are written in the same batch that creates / resubmits the shop.
+      match /documents/{docType} {
         allow read: if ownsShop(shopId) || isAdmin();
-        allow write: if ownsShop(shopId) && docId == 'document'
-          && shopDoc(shopId).data.status != 'APPROVED'
+        allow create, update: if signedIn()
+          && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.owner_uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == 'PENDING'
+          && docType in ['GST_CERTIFICATE', 'ADDRESS_PROOF', 'OWNERSHIP_PROOF', 'SHOP_FRONT_PHOTO']
           && request.resource.data.data_url is string
-          && request.resource.data.data_url.size() < 900000;
+          && request.resource.data.data_url.matches('^data:image/jpeg;base64,.*')
+          && request.resource.data.data_url.size() < 900000
+          && request.resource.data.verification_status == 'PENDING';
+        allow delete: if ownsShop(shopId) && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == 'PENDING';
+        // Admin reviews each document.
+        allow update: if isAdmin() && onlyChanges(['verification_status', 'admin_comment'])
+          && request.resource.data.verification_status in ['APPROVED', 'REJECTED', 'PENDING'];
       }
 
       match /verifications/{id} {

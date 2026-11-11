@@ -8,7 +8,7 @@ import {
   CreatePartyPayload, UpdatePartyPayload, HistoryFilterOptions, DuesFilterOptions,
   ReportFilterOptions, InvoiceSettings, NotificationSettings, AppPreferences,
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, DateRangeOption, LedgerFilterOptions,
-  CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData
+  CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData, ShopDocumentType
 } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { compute } from './data/compute';
@@ -56,6 +56,14 @@ export const api = {
     if (!activeShop) throw new AppError('No shop is linked to this account', 'NO_SHOP');
     return { message: 'Resubmitted for review', shop: await session.resubmitShop(activeShop.id, payload) };
   },
+  getMyShopDocuments: async () => {
+    if (!activeShop) throw new AppError('No shop is linked to this account', 'NO_SHOP');
+    return session.listShopDocuments(activeShop.id);
+  },
+  adminReviewDocument: (shopId: string, type: ShopDocumentType, status: 'APPROVED' | 'REJECTED', comment: string | null) =>
+    session.adminReviewDocument(shopId, type, status, comment),
+  watchAdminNotifications: session.watchAdminNotifications,
+  markAdminNotificationRead: session.markAdminNotificationRead,
   getAdminShops: async (status?: string) => ({ shops: await session.adminListShops(status) }),
   getAdminShopDetails: (id: string) => session.adminShopDetails(id),
   recordAdminDecision: async (id: string, payload: AdminDecisionPayload) => {
