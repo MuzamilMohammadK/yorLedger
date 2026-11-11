@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Users, Plus, Wallet, Menu, ScrollText, BarChart3, Settings, LogOut, Bell, Languages, X } from 'lucide-react';
+import { Home, Users, Plus, Wallet, Menu, ScrollText, BarChart3, Settings, LogOut, Bell, Languages, BookOpen } from 'lucide-react';
 import { BillKind, Party, formatPaiseToINR } from '@yorbalance/shared';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n, LANGUAGES } from '../../i18n';
@@ -24,16 +24,20 @@ export const useShell = () => {
   return c;
 };
 
-const MAIN = [
+// §5 primary navigation, in the document's order.
+const NAV = [
   { to: '/dashboard', key: 'nav_home', icon: Home },
   { to: '/parties', key: 'nav_parties', icon: Users },
-  { to: '/dues', key: 'nav_dues', icon: Wallet }
-] as const;
-const EXTRA = [
+  { to: '/ledger', key: 'nav_ledger', icon: BookOpen },
   { to: '/history', key: 'nav_history', icon: ScrollText },
-  { to: '/analytics', key: 'nav_reports', icon: BarChart3 },
+  { to: '/dues', key: 'nav_dues', icon: Wallet },
+  { to: '/reports', key: 'nav_reports', icon: BarChart3 },
   { to: '/settings', key: 'nav_settings', icon: Settings }
 ] as const;
+// Phone bottom bar: Dashboard, Parties, Ledger (centre), Dues, More (History, Reports, Settings).
+const BOTTOM_LEFT = [NAV[0], NAV[1]];
+const BOTTOM_RIGHT = NAV[4];
+const EXTRA = [NAV[3], NAV[5], NAV[6]];
 
 /** Frame for every signed-in, approved shop screen. */
 export const AppShell: React.FC = () => {
@@ -108,7 +112,7 @@ export const AppShell: React.FC = () => {
             className="h-14 rounded-2xl bg-indigo-700 text-white text-lg font-bold flex items-center justify-center gap-2 mb-2">
             <Plus className="w-6 h-6" /> {t('nav_new_bill')}
           </button>
-          {[...MAIN, ...EXTRA].map(({ to, key, icon: Icon }) => (
+          {NAV.map(({ to, key, icon: Icon }) => (
             <NavLink key={to} to={to} className={navCls}><Icon className="w-5 h-5" /> {t(key)}</NavLink>
           ))}
           <div className="mt-auto space-y-3">
@@ -129,6 +133,7 @@ export const AppShell: React.FC = () => {
               <p className="md:hidden text-lg font-extrabold text-indigo-800 leading-tight">YorLedger</p>
               <p className="text-sm md:text-base text-slate-600 truncate">{shop?.name}</p>
             </div>
+            <div className="flex items-center gap-1">
             <button onClick={() => setAlertsOpen(true)} aria-label={t('alerts')}
               className="relative w-12 h-12 rounded-full hover:bg-slate-100 flex items-center justify-center">
               <Bell className="w-6 h-6 text-slate-700" />
@@ -136,6 +141,13 @@ export const AppShell: React.FC = () => {
                 <span className="absolute top-1 right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center">{unread}</span>
               )}
             </button>
+            <NavLink to="/settings" aria-label={t('profile')} title={t('profile')}
+              className="w-12 h-12 rounded-full flex items-center justify-center">
+              <span className="w-10 h-10 rounded-full bg-indigo-700 text-white text-lg font-bold flex items-center justify-center">
+                {(shop?.owner_name ?? '?').trim().charAt(0).toUpperCase()}
+              </span>
+            </NavLink>
+            </div>
           </header>
 
           <main className="flex-1 w-full max-w-5xl mx-auto p-4 md:p-6 pb-28 md:pb-8">
@@ -145,17 +157,17 @@ export const AppShell: React.FC = () => {
 
         {/* Phone bottom bar */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 h-20 grid grid-cols-5 items-center pb-[env(safe-area-inset-bottom)]">
-          {MAIN.slice(0, 2).map(({ to, key, icon: Icon }) => (
+          {BOTTOM_LEFT.map(({ to, key, icon: Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `flex flex-col items-center gap-1 text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-slate-500'}`}>
               <Icon className="w-6 h-6" />{t(key)}
             </NavLink>
           ))}
-          <button onClick={() => shell.openNewBill()} aria-label={t('nav_new_bill')} className="flex flex-col items-center gap-1 text-xs font-bold text-indigo-700">
-            <span className="w-14 h-14 -mt-6 rounded-full bg-indigo-700 text-white shadow-lg flex items-center justify-center"><Plus className="w-8 h-8" /></span>
-            {t('nav_new_bill')}
-          </button>
-          <NavLink to="/dues" className={({ isActive }) => `flex flex-col items-center gap-1 text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-slate-500'}`}>
-            <Wallet className="w-6 h-6" />{t('nav_dues')}
+          <NavLink to="/ledger" aria-label={t('nav_ledger')} className={({ isActive }) => `flex flex-col items-center gap-1 text-xs font-bold ${isActive ? 'text-indigo-800' : 'text-indigo-700'}`}>
+            <span className="w-14 h-14 -mt-6 rounded-full bg-indigo-700 text-white shadow-lg flex items-center justify-center"><BookOpen className="w-7 h-7" /></span>
+            {t('nav_ledger')}
+          </NavLink>
+          <NavLink to={BOTTOM_RIGHT.to} className={({ isActive }) => `flex flex-col items-center gap-1 text-xs font-semibold ${isActive ? 'text-indigo-700' : 'text-slate-500'}`}>
+            <Wallet className="w-6 h-6" />{t(BOTTOM_RIGHT.key)}
           </NavLink>
           <button onClick={() => setMoreOpen(true)} className="flex flex-col items-center gap-1 text-xs font-semibold text-slate-500">
             <Menu className="w-6 h-6" />{t('nav_more')}

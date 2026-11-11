@@ -8,7 +8,8 @@ import {
   CreatePartyPayload, UpdatePartyPayload, HistoryFilterOptions, DuesFilterOptions,
   ReportFilterOptions, InvoiceSettings, NotificationSettings, AppPreferences,
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, DateRangeOption, LedgerFilterOptions,
-  CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData, ShopDocumentType
+  CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData, ShopDocumentType,
+  DashboardPeriod, DashBill, dashboardFigures, dashboardSeries
 } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { compute } from './data/compute';
@@ -234,6 +235,19 @@ export const api = {
   exportShopData: async (type: 'transactions' | 'parties' | 'reports') => {
     const s = await shopReady();
     return compute.exportShopData(s.id, type).data;
+  },
+
+  /** §6 dashboard: figures + chart series for a period, exact paise. */
+  getDashboard: async (period: DashboardPeriod) => {
+    await shopReady();
+    const today = todayIST();
+    const bills: DashBill[] = cache.rawBills().map(b => ({
+      id: b.id, kind: b.kind, bill_date: b.bill_date, grand_total: b.grand_total,
+      returned_total: b.returned_total, paid_total: b.paid_total, amount_due: b.amount_due
+    }));
+    const pays = cache.payments().map(p => ({ date: p.payment_date }));
+    const rets = cache.returns().map(r => ({ date: r.return_date }));
+    return { figures: dashboardFigures(period, today, bills, pays, rets), series: dashboardSeries(period, today, bills, pays, rets) };
   },
 
   /** Every live bill (exact paise), newest first. */
