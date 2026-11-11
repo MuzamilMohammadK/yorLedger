@@ -44,6 +44,7 @@ import {
 } from '@yorbalance/shared';
 import { calculateSummary, calculateCharts } from './analytics';
 import { cache } from './cache';
+import { todayIST } from './util';
 
 // Read-side calculations shared by Dashboard, Parties, Ledger, History, Dues and Reports.
 // Data comes from the live Firestore cache (./cache), never from sample data.
@@ -344,7 +345,7 @@ export const compute = {
         const remainingPaise = Math.max(0, t.grand_total_paise - (t.return_paise || 0) - t.paid_paise);
         let status = t.status;
         if (remainingPaise === 0) status = 'SETTLED';
-        else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) status = 'OVERDUE';
+        else if (t.due_date && t.due_date < todayIST()) status = 'OVERDUE';
         else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) status = 'PARTIAL';
         else status = 'PENDING';
 
@@ -503,7 +504,7 @@ export const compute = {
     const remainingPaise = Math.max(0, t.grand_total_paise - (t.return_paise || 0) - t.paid_paise);
     let status = t.status;
     if (remainingPaise === 0) status = 'SETTLED';
-    else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) status = 'OVERDUE';
+    else if (t.due_date && t.due_date < todayIST()) status = 'OVERDUE';
     else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) status = 'PARTIAL';
     else status = 'PENDING';
 
@@ -529,7 +530,7 @@ export const compute = {
       if (remainingRupees <= 0) continue;
 
       let status = t.status;
-      if (t.due_date && new Date(t.due_date).getTime() < Date.now()) {
+      if (t.due_date && t.due_date < todayIST()) {
         status = 'OVERDUE';
       }
 
@@ -573,7 +574,7 @@ export const compute = {
       let status: 'PENDING' | 'PARTIAL' | 'OVERDUE' | 'SETTLED' = 'PENDING';
       if (remaining_due === 0) {
         status = 'SETTLED';
-      } else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) {
+      } else if (t.due_date && t.due_date < todayIST()) {
         status = 'OVERDUE';
       } else if (amount_paid > 0 || returns > 0) {
         status = 'PARTIAL';
@@ -723,7 +724,7 @@ export const compute = {
       const remainingPaise = Math.max(0, t.grand_total_paise - (t.return_paise || 0) - t.paid_paise);
       let payment_status: PaymentStatus = 'PENDING';
       if (remainingPaise === 0) payment_status = 'SETTLED';
-      else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) payment_status = 'OVERDUE';
+      else if (t.due_date && t.due_date < todayIST()) payment_status = 'OVERDUE';
       else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) payment_status = 'PARTIAL';
 
       items.push({
@@ -818,7 +819,7 @@ export const compute = {
 
       let payment_status: PaymentStatus = 'PENDING';
       if (remaining_due === 0) payment_status = 'SETTLED';
-      else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) payment_status = 'OVERDUE';
+      else if (t.due_date && t.due_date < todayIST()) payment_status = 'OVERDUE';
       else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) payment_status = 'PARTIAL';
 
       items.push({
@@ -909,7 +910,7 @@ export const compute = {
 
       let payment_status: PaymentStatus = 'PENDING';
       if (outstanding_amount === 0) payment_status = 'SETTLED';
-      else if (t.due_date && new Date(t.due_date).getTime() < Date.now()) payment_status = 'OVERDUE';
+      else if (t.due_date && t.due_date < todayIST()) payment_status = 'OVERDUE';
       else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) payment_status = 'PARTIAL';
 
       const work_details = t.items?.[0]?.item_name || t.notes || 'Handloom Jacquard & Korvai Weaving';

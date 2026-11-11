@@ -114,9 +114,9 @@ export const api = {
     const s = await shopReady();
     return ledger.isSaleInvoiceFree(s.id, raw);
   },
-  updateBillReminder: async (billId: string, remindOn: string | null, leadDays: number | null) => {
+  updateBillReminder: async (billId: string, remindOn: string | null, leadDays: number | null, notes?: string | null) => {
     const s = await shopReady();
-    await ledger.updateBillReminder(s.id, billId, remindOn, leadDays);
+    await ledger.updateBillReminder(s.id, billId, remindOn, leadDays, notes);
   },
   deleteBill: async (billId: string) => {
     const s = await shopReady();
