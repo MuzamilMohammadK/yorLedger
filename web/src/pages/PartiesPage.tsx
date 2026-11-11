@@ -66,7 +66,11 @@ export const PartiesPage: React.FC = () => {
 
   const viewing = parties.find(p => p.id === viewingId) ?? null;
   const openParty = (p: Party) => { setConfirmDel(false); setDelError(null); setParams({ party: p.id }); };
-  const closeForm = () => { setEditing(null); if (params.get('new')) setParams({}); };
+  // Remove only the "new" flag, so a party opened by onSuccess stays open.
+  const closeForm = () => {
+    setEditing(null);
+    setParams(prev => { const n = new URLSearchParams(prev); n.delete('new'); return n; });
+  };
 
   const balance = (p: Party) => {
     const v = pos.get(p.id) ?? { balance: 0, credit: 0 };
