@@ -183,7 +183,7 @@ test('complete shop journey', async ({ browser }, info) => {
   await test.step('10. cheque payment on the purchase', async () => {
     await openBill('Dharmavaram Weavers Co');
     await owner.getByRole('button', { name: 'Paid money' }).click();
-    await owner.getByRole('button', { name: 'Cheque' }).click();
+    await owner.getByRole('button', { name: 'Cheque', exact: true }).click();
     await owner.getByLabel('Cheque number').fill('482913');
     await snap(owner, 'payment-cheque');
     await owner.getByRole('button', { name: 'Save payment' }).click();
@@ -193,7 +193,7 @@ test('complete shop journey', async ({ browser }, info) => {
   await test.step('11. NEFT payment on the job work', async () => {
     await openBill('Lakshmamma Looms');
     await owner.getByRole('button', { name: 'Paid money' }).click();
-    await owner.getByRole('button', { name: 'Bank / NEFT' }).click();
+    await owner.getByRole('button', { name: 'Bank / NEFT', exact: true }).click();
     await owner.getByLabel('Amount ₹').fill('1000');
     await owner.getByLabel('UTR / reference number').fill(`SBIN4263${String(Date.now()).slice(-8)}`);
     await snap(owner, 'payment-neft');

@@ -7,7 +7,9 @@ const emulatorCsp = (): Plugin => ({
   name: 'emulator-csp',
   transformIndexHtml(html) {
     if (process.env.VITE_USE_EMULATORS !== 'true') return html;
-    return html.replace("connect-src 'self'", "connect-src 'self' http://127.0.0.1:9099 http://127.0.0.1:8080 ws://127.0.0.1:8080");
+    return html
+      .replace("connect-src 'self'", "connect-src 'self' http://127.0.0.1:9099 http://127.0.0.1:8080 ws://127.0.0.1:8080")
+      .replace('frame-src ', 'frame-src http://127.0.0.1:9099 ');
   }
 });
 
