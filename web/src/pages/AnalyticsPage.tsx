@@ -1,365 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import { DashboardLayout } from '../components/layout/DashboardLayout';
+import React, { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ShoppingBag, TrendingUp, Scissors, BarChart3, ChevronRight } from 'lucide-react';
+import { ReportFilterOptions, financialYearOptions, resolveReportPeriod, toCsv } from '@yorbalance/shared';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n';
+import { api } from '../lib/api';
+import { useLive } from '../lib/useLiveData';
+import { todayIST } from '../lib/data/util';
+import { shareFile } from '../lib/platform';
 import { ReportFilterBar } from '../components/reports/ReportFilterBar';
 import { PurchaseLedgerTable } from '../components/reports/PurchaseLedgerTable';
 import { SalesLedgerTable } from '../components/reports/SalesLedgerTable';
 import { JobWorkLedgerTable } from '../components/reports/JobWorkLedgerTable';
 import { GSTDashboardView } from '../components/reports/GSTDashboardView';
-import { api } from '../lib/api';
-import {
-  ReportFilterOptions,
-  PurchaseLedgerReport,
-  SalesLedgerReport,
-  ArtisanJobWorkReport,
-  GSTDashboardData
-} from '@yorbalance/shared';
-import {
-  ShoppingBag,
-  TrendingUp,
-  Scissors,
-  Receipt,
-  ArrowRight,
-  ChevronLeft,
-  FileSpreadsheet,
-  Download,
-  Printer,
-  Sparkles,
-  BarChart3
-} from 'lucide-react';
 
-type ReportTab = 'OVERVIEW' | 'PURCHASE' | 'SALES' | 'JOB_WORK' | 'GST';
+type Tab = 'overview' | 'purchase' | 'sales' | 'job' | 'gst';
+const FILTER_KEY = 'yorledger_report_filters';
 
+/** §11 Reports & GST analytics: four report sheets, common filters, CSV export and print. */
 export const AnalyticsPage: React.FC = () => {
-  const currentYear = new Date().getFullYear();
-  const defaultFY = `FY ${currentYear}-${((currentYear + 1) % 100).toString().padStart(2, '0')}`;
-
-  const [activeTab, setActiveTab] = useState<ReportTab>('OVERVIEW');
-  const [filters, setFilters] = useState<ReportFilterOptions>({
-    financialYear: defaultFY
+  const { t } = useI18n();
+  const { shop } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get('r') as Tab) || 'overview';
+  const setTab = (r: Tab) => setParams(r === 'overview' ? {} : { r });
+  const [filters, setFiltersState] = React.useState<ReportFilterOptions>(() => {
+    try { const s = localStorage.getItem(FILTER_KEY); if (s) return JSON.parse(s); } catch { /* optional */ }
+    return { financialYear: financialYearOptions(todayIST())[0].value };
   });
+  const setFilters = (f: ReportFilterOptions) => { setFiltersState(f); try { localStorage.setItem(FILTER_KEY, JSON.stringify(f)); } catch { /* optional */ } };
+  const period = resolveReportPeriod(filters, todayIST());
+  const key = JSON.stringify(filters);
 
-  const [loading, setLoading] = useState(false);
-  const [purchaseReport, setPurchaseReport] = useState<PurchaseLedgerReport | null>(null);
-  const [salesReport, setSalesReport] = useState<SalesLedgerReport | null>(null);
-  const [jobWorkReport, setJobWorkReport] = useState<ArtisanJobWorkReport | null>(null);
-  const [gstDashboard, setGstDashboard] = useState<GSTDashboardData | null>(null);
-  const [disclaimer, setDisclaimer] = useState<string>('');
+  const { data: purchase } = useLive(() => api.getPurchaseLedger(filters), [key]);
+  const { data: sales } = useLive(() => api.getSalesLedger(filters), [key]);
+  const { data: job } = useLive(() => api.getJobWorkLedger(filters), [key]);
+  const { data: gst } = useLive(() => api.getGSTDashboard(filters), [key]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'OVERVIEW' || activeTab === 'PURCHASE') {
-        const res = await api.getPurchaseLedger(filters);
-        setPurchaseReport(res.report);
-      }
-      if (activeTab === 'OVERVIEW' || activeTab === 'SALES') {
-        const res = await api.getSalesLedger(filters);
-        setSalesReport(res.report);
-      }
-      if (activeTab === 'OVERVIEW' || activeTab === 'JOB_WORK') {
-        const res = await api.getJobWorkLedger(filters);
-        setJobWorkReport(res.report);
-      }
-      if (activeTab === 'OVERVIEW' || activeTab === 'GST') {
-        const res = await api.getGSTDashboard(filters);
-        setGstDashboard(res.gst_data);
-        setDisclaimer(res.disclaimer);
-      }
-    } catch (err) {
-      console.error('Failed to load reports data', err);
-    } finally {
-      setLoading(false);
+  const tabs: { id: Tab; label: string; icon: typeof ShoppingBag; desc: string; count?: string }[] = useMemo(() => [
+    { id: 'purchase', label: t('rep_purchase'), icon: ShoppingBag, desc: t('rep_purchase_desc'), count: purchase ? t('bills_n', { n: purchase.report.items.length }) : '' },
+    { id: 'sales', label: t('rep_sales'), icon: TrendingUp, desc: t('rep_sales_desc'), count: sales ? t('bills_n', { n: sales.report.items.length }) : '' },
+    { id: 'job', label: t('rep_job'), icon: Scissors, desc: t('rep_job_desc'), count: job ? t('artisans_n', { n: job.report.artisan_summaries.length }) : '' },
+    { id: 'gst', label: t('rep_gst'), icon: BarChart3, desc: t('rep_gst_desc') }
+  ], [t, purchase, sales, job]);
+
+  // CSV of exactly what this report shows (same numbers, same period), with shop identity.
+  const exportCsv = async () => {
+    const meta = { shop: shop?.name ?? '', gstin: shop?.gstin ?? '', period: `${period.label} (${period.from} to ${period.to})`, report: '' };
+    let csv = '';
+    let name = 'report';
+    if (tab === 'purchase' && purchase) {
+      const r = purchase.report;
+      name = 'purchase-ledger';
+      csv = toCsv({ ...meta, report: 'Purchase ledger' }, [
+        { key: 'supplier_name', label: 'Supplier' }, { key: 'supplier_gstin', label: 'Supplier GSTIN' }, { key: 'invoice_number', label: 'Bill no.' },
+        { key: 'bill_date', label: 'Bill date' }, { key: 'taxable_value', label: 'Taxable value' }, { key: 'cgst', label: 'CGST' }, { key: 'sgst', label: 'SGST' },
+        { key: 'igst', label: 'IGST' }, { key: 'total_gst', label: 'Total GST' }, { key: 'returns', label: 'Returns' },
+        { key: 'net_purchase_amount', label: 'Net purchase amount' }, { key: 'eligible_itc', label: 'Eligible ITC' }, { key: 'payment_status', label: 'Payment status' }
+      ], r.items as any, {
+        taxable_value: r.totals.total_taxable_value, cgst: r.totals.total_cgst, sgst: r.totals.total_sgst, igst: r.totals.total_igst,
+        total_gst: r.totals.total_gst, returns: r.totals.total_returns, net_purchase_amount: r.totals.total_purchase_value, eligible_itc: r.totals.eligible_itc
+      });
+    } else if (tab === 'sales' && sales) {
+      const r = sales.report;
+      name = 'sales-ledger';
+      csv = toCsv({ ...meta, report: 'Sales ledger' }, [
+        { key: 'customer_name', label: 'Customer' }, { key: 'customer_gstin', label: 'Customer GSTIN' }, { key: 'invoice_number', label: 'Bill no.' },
+        { key: 'bill_date', label: 'Bill date' }, { key: 'sales_type', label: 'Same / other state' }, { key: 'taxable_value', label: 'Taxable value' },
+        { key: 'cgst', label: 'CGST' }, { key: 'sgst', label: 'SGST' }, { key: 'igst', label: 'IGST' }, { key: 'total_gst', label: 'Total GST' },
+        { key: 'grand_total', label: 'Bill total (after returns)' }, { key: 'amount_paid', label: 'Paid' }, { key: 'remaining_due', label: 'Remaining due' },
+        { key: 'payment_status', label: 'Payment status' }
+      ], r.items as any, {
+        taxable_value: r.totals.total_taxable_sales, cgst: r.totals.total_cgst, sgst: r.totals.total_sgst, igst: r.totals.total_igst,
+        total_gst: r.totals.total_output_gst, grand_total: r.totals.total_sales_value, amount_paid: r.totals.total_paid, remaining_due: r.totals.total_outstanding_due
+      });
+    } else if (tab === 'job' && job) {
+      const r = job.report;
+      name = 'job-work';
+      csv = toCsv({ ...meta, report: 'Artisan & job work' }, [
+        { key: 'artisan_name', label: 'Artisan' }, { key: 'job_work_reference', label: 'Bill no.' }, { key: 'transaction_date', label: 'Date' },
+        { key: 'work_details', label: 'Work' }, { key: 'quantity', label: 'Quantity' }, { key: 'job_work_amount', label: 'Job-work amount' },
+        { key: 'gst', label: 'GST' }, { key: 'total_amount', label: 'Total' }, { key: 'amount_paid', label: 'Paid' },
+        { key: 'outstanding_amount', label: 'Outstanding' }, { key: 'payment_status', label: 'Payment status' }
+      ], r.items as any, {
+        job_work_amount: r.totals.total_job_work_value, gst: r.totals.total_gst, amount_paid: r.totals.total_payments, outstanding_amount: r.totals.total_outstanding
+      });
+    } else if (gst) {
+      const g = gst.gst_data;
+      name = 'gst-dashboard';
+      const rows = [
+        { a: 'Total taxable sales', b: g.summary.total_taxable_sales }, { a: 'Output tax', b: g.summary.output_gst },
+        { a: 'Eligible input tax credit', b: g.summary.eligible_itc }, { a: 'Net GST payable', b: g.summary.net_gst_payable },
+        { a: 'Output CGST', b: g.tax_breakdown.output_cgst }, { a: 'Output SGST', b: g.tax_breakdown.output_sgst }, { a: 'Output IGST', b: g.tax_breakdown.output_igst },
+        { a: 'Input CGST', b: g.tax_breakdown.input_cgst }, { a: 'Input SGST', b: g.tax_breakdown.input_sgst }, { a: 'Input IGST', b: g.tax_breakdown.input_igst },
+        ...g.charts.monthly_net_payable_trend.map(m => ({ a: `Net payable ${m.month}`, b: m.net_payable }))
+      ];
+      csv = toCsv({ ...meta, report: 'GST dashboard' }, [{ key: 'a', label: 'Item' }, { key: 'b', label: 'Amount' }], rows) + `\r\n\r\n"${gst.disclaimer.replace(/"/g, '""')}"`;
     }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [activeTab, filters.financialYear, filters.quarter, filters.month, filters.from, filters.to, filters.partySearch]);
-
-  const handleExportCsv = async () => {
-    try {
-      const type = activeTab === 'OVERVIEW' || activeTab === 'GST' ? 'reports' : 'transactions';
-      const csv = await api.exportShopData(type as any);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `yorledger_${activeTab.toLowerCase()}_report_${Date.now()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Failed to export CSV', e);
-      alert('Unable to generate CSV export');
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
+    if (csv) await shareFile(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `yorledger-${name}-${period.from}-to-${period.to}.csv`, name);
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold uppercase tracking-wider text-purple-600">
-                Official Registers & Tax Filing
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-sm font-bold bg-purple-50 text-purple-700">
-                Reports & GST Analytics
-              </span>
-            </div>
-            <h1 className="font-serif-display text-2xl font-bold text-slate-900 mt-1">
-              Business Reports & GST Analytics
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              Input tax credit reconciliation, sales output liability, artisan job-work accounts and statutory compliance.
-            </p>
-          </div>
-
-          {activeTab !== 'OVERVIEW' && (
-            <button
-              onClick={() => setActiveTab('OVERVIEW')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs transition-colors self-start sm:self-auto"
-            >
-              <ChevronLeft className="w-4 h-4 text-slate-500" />
-              <span>Back to Report Cards</span>
-            </button>
-          )}
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none print:hidden">
-          <button
-            onClick={() => setActiveTab('OVERVIEW')}
-            className={`px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
-              activeTab === 'OVERVIEW'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            All Reports Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('PURCHASE')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
-              activeTab === 'PURCHASE'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Purchase Ledger & ITC</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('SALES')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
-              activeTab === 'SALES'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Sales Ledger & GSTR-1</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('JOB_WORK')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
-              activeTab === 'JOB_WORK'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Scissors className="w-3.5 h-3.5" />
-            <span>Artisan & Job Work</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('GST')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 ${
-              activeTab === 'GST'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>GST Dashboard & 3B</span>
-          </button>
-        </div>
-
-        {/* Global Common Filter Bar */}
-        <ReportFilterBar
-          filters={filters}
-          onChange={setFilters}
-          onExportCsv={handleExportCsv}
-          onPrint={handlePrint}
-          loading={loading}
-          showPartySearch={activeTab !== 'GST'}
-        />
-
-        {/* TAB 1: 4 Report Cards Overview Landing Page */}
-        {activeTab === 'OVERVIEW' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Card 1: Purchase Ledger */}
-              <div
-                onClick={() => setActiveTab('PURCHASE')}
-                className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <ShoppingBag className="w-6 h-6" />
-                    </div>
-                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                      Input Tax Credit
-                    </span>
-                  </div>
-                  <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                    1. Purchase Ledger
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Supplier-wise bill records, GSTIN verification, returns reconciliation, and calculation of statutory eligible Input Tax Credit (ITC).
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-400">
-                    {purchaseReport?.items.length || 0} Bills Recorded
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
-                    Open Register <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 2: Sales Ledger */}
-              <div
-                onClick={() => setActiveTab('SALES')}
-                className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <TrendingUp className="w-6 h-6" />
-                    </div>
-                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
-                      Output Liability
-                    </span>
-                  </div>
-                  <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                    2. Sales Ledger
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Customer billings, separation of retail intra-state sales from out-of-state inter-state (IGST) shipments, collections, and dues.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-400">
-                    {salesReport?.items.length || 0} Invoices Recorded
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
-                    Open Register <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 3: Artisan & Job Work */}
-              <div
-                onClick={() => setActiveTab('JOB_WORK')}
-                className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <Scissors className="w-6 h-6" />
-                    </div>
-                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                      Production & Labor
-                    </span>
-                  </div>
-                  <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                    3. Artisan and Job Work
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Weaver, dyer, and embroidery job work tracking, material quantities, labor disbursements, and outstanding wages dues.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-400">
-                    {jobWorkReport?.artisan_summaries.length || 0} Artisans
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
-                    Open Register <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 4: GST Dashboard */}
-              <div
-                onClick={() => setActiveTab('GST')}
-                className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <BarChart3 className="w-6 h-6" />
-                    </div>
-                    <span className="text-sm font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                      GSTR-3B Analytics
-                    </span>
-                  </div>
-                  <h3 className="font-serif-display text-lg font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                    4. GST Dashboard
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Net cash challan payable, CGST/SGST/IGST breakdown matrix, monthly turnover trends, and interactive analytical charts.
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-400">
-                    Analytical Tax Modeling
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-purple-600 group-hover:translate-x-0.5 transition-transform">
-                    Open Dashboard <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Glance at GST Dashboard on Overview Page */}
-            <div className="pt-4">
-              <GSTDashboardView data={gstDashboard} disclaimer={disclaimer} loading={loading} />
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: Purchase Ledger */}
-        {activeTab === 'PURCHASE' && (
-          <PurchaseLedgerTable report={purchaseReport} loading={loading} />
-        )}
-
-        {/* TAB 3: Sales Ledger */}
-        {activeTab === 'SALES' && (
-          <SalesLedgerTable report={salesReport} loading={loading} />
-        )}
-
-        {/* TAB 4: Artisan & Job Work */}
-        {activeTab === 'JOB_WORK' && (
-          <JobWorkLedgerTable report={jobWorkReport} loading={loading} />
-        )}
-
-        {/* TAB 5: GST Dashboard */}
-        {activeTab === 'GST' && (
-          <GSTDashboardView data={gstDashboard} disclaimer={disclaimer} loading={loading} />
-        )}
+    <div className="space-y-5">
+      {/* Print header: shop identity + period on paper (§11.8) */}
+      <div className="hidden print:block">
+        <p className="text-xl font-bold">{shop?.name} · GSTIN {shop?.gstin}</p>
+        <p>{tabs.find(x => x.id === tab)?.label ?? t('rep_overview')} · {period.label} ({period.from} – {period.to})</p>
       </div>
-    </DashboardLayout>
+
+      <div className="print:hidden">
+        <h1 className="text-2xl font-bold text-slate-900">{t('nav_reports')}</h1>
+        <p className="text-base text-slate-600">{t('reports_sub')}</p>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 print:hidden">
+        {[{ id: 'overview' as Tab, label: t('rep_overview') }, ...tabs].map(x => (
+          <button key={x.id} onClick={() => setTab(x.id)}
+            className={`h-11 px-4 shrink-0 rounded-full text-base font-semibold ${tab === x.id ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+            {x.label}
+          </button>
+        ))}
+      </div>
+
+      <ReportFilterBar filters={filters} onChange={setFilters} onExportCsv={tab === 'overview' ? undefined : exportCsv}
+        onPrint={() => window.print()} showPartySearch={tab !== 'gst' && tab !== 'overview'} periodLabel={`${period.label} · ${period.from} → ${period.to}`} />
+      <p className="hidden md:block text-sm text-slate-500 print:hidden">{t('report_period')}: {period.label} ({period.from} → {period.to})</p>
+
+      {tab === 'overview' && (
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {tabs.map(x => (
+              <button key={x.id} onClick={() => setTab(x.id)} className="text-left rounded-2xl bg-white border border-slate-200 p-4 hover:border-indigo-300">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center"><x.icon className="w-6 h-6" /></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-lg font-bold text-slate-900">{x.label}</p>
+                    <p className="text-sm text-slate-600">{x.desc}</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                </div>
+                {x.count && <p className="mt-2 text-sm font-semibold text-slate-500">{x.count}</p>}
+              </button>
+            ))}
+          </div>
+          {gst && <GSTDashboardView data={gst.gst_data as any} disclaimer={gst.disclaimer} loading={false} />}
+        </div>
+      )}
+      {tab === 'purchase' && <PurchaseLedgerTable report={(purchase?.report ?? null) as any} loading={!purchase} />}
+      {tab === 'sales' && <SalesLedgerTable report={(sales?.report ?? null) as any} loading={!sales} />}
+      {tab === 'job' && <JobWorkLedgerTable report={(job?.report ?? null) as any} loading={!job} />}
+      {tab === 'gst' && gst && <GSTDashboardView data={gst.gst_data as any} disclaimer={gst.disclaimer} loading={false} />}
+    </div>
   );
 };

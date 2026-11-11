@@ -9,7 +9,8 @@ import {
   ReportFilterOptions, InvoiceSettings, NotificationSettings, AppPreferences,
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, DateRangeOption, LedgerFilterOptions,
   CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData, ShopDocumentType,
-  DashboardPeriod, DashBill, dashboardFigures, dashboardSeries
+  DashboardPeriod, DashBill, dashboardFigures, dashboardSeries,
+  ReportBill, purchaseLedger, salesLedger, jobWorkLedger, gstDashboard
 } from '@yorbalance/shared';
 import { cache } from './data/cache';
 import { compute } from './data/compute';
@@ -39,11 +40,33 @@ async function shopReady(): Promise<Shop> {
 }
 
 const GST_DISCLAIMER =
-  'These are accounting summaries, not a filed GST return. Please have your accountant check the figures before filing GSTR-1 / GSTR-3B.';
+  'These are accounting summaries, not a filed GST return. Figures use bills after returns (credit notes). ' +
+  'Eligible ITC counts GST on purchase bills from suppliers with a GSTIN, after returns; job-work GST is shown separately. ' +
+  'Please have your accountant check the figures before filing GSTR-1 / GSTR-3B.';
 
-async function report<K extends 'getPurchaseLedger' | 'getSalesLedger' | 'getJobWorkLedger'>(fn: K, options?: ReportFilterOptions) {
+/** Bills in the shape the §11 report functions need (effective values after returns). */
+function reportBills(): ReportBill[] {
+  const rets = new Map<string, ReportBill['returns']>();
+  for (const r of cache.rawReturns()) {
+    const list = rets.get(r.bill_id) ?? [];
+    list.push({ taxable: r.taxable_reduction ?? 0, cgst: r.cgst ?? 0, sgst: r.sgst ?? 0, igst: r.igst ?? 0, total: r.total_reduction ?? 0 });
+    rets.set(r.bill_id, list);
+  }
+  return cache.rawBills().map(b => {
+    const p = cache.rawParty(b.party_id);
+    return {
+      id: b.id, kind: b.kind, invoice_no: String(b.invoice_no), bill_date: b.bill_date, due_date: b.remind_on ?? null,
+      party_id: b.party_id, party_name: p?.name ?? b.party_name, party_gstin: p?.gstin ?? null, tax_mode: b.tax_mode,
+      items: (b.items ?? []).map((i: any) => ({ name: i.name, qty: i.qty })),
+      subtotal: b.subtotal, cgst: b.cgst, sgst: b.sgst, igst: b.igst, grand_total: b.grand_total, paid_total: b.paid_total,
+      returns: rets.get(b.id) ?? []
+    };
+  });
+}
+
+async function report<T>(fn: (bills: ReportBill[], f: ReportFilterOptions, today: string) => T, options?: ReportFilterOptions) {
   const shop = await shopReady();
-  return { shop_id: shop.id, shop_name: shop.name, gstin: shop.gstin, report: compute[fn](shop.id, options) as ReturnType<typeof compute[K]> };
+  return { shop_id: shop.id, shop_name: shop.name, gstin: shop.gstin, report: fn(reportBills(), options ?? {}, todayIST()) };
 }
 
 export const api = {
@@ -195,12 +218,12 @@ export const api = {
   },
 
   // ---------- Reports & GST ----------
-  getPurchaseLedger: (options?: ReportFilterOptions) => report('getPurchaseLedger', options),
-  getSalesLedger: (options?: ReportFilterOptions) => report('getSalesLedger', options),
-  getJobWorkLedger: (options?: ReportFilterOptions) => report('getJobWorkLedger', options),
+  getPurchaseLedger: (options?: ReportFilterOptions) => report(purchaseLedger, options),
+  getSalesLedger: (options?: ReportFilterOptions) => report(salesLedger, options),
+  getJobWorkLedger: (options?: ReportFilterOptions) => report(jobWorkLedger, options),
   getGSTDashboard: async (options?: ReportFilterOptions) => {
     const s = await shopReady();
-    return { shop_id: s.id, shop_name: s.name, gstin: s.gstin, gst_data: compute.getGSTDashboard(s.id, options), disclaimer: GST_DISCLAIMER };
+    return { shop_id: s.id, shop_name: s.name, gstin: s.gstin, gst_data: gstDashboard(reportBills(), options ?? {}, todayIST()), disclaimer: GST_DISCLAIMER };
   },
 
   // ---------- Settings ----------

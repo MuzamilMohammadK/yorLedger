@@ -40,7 +40,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Job Work Value</span>
           <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
-            {formatINR(totals.total_job_work_value)}
+            {formatINR(totals.total_job_work_value, true)}
           </span>
           <span className="text-sm text-slate-500">{items.length} Work Orders</span>
         </div>
@@ -48,7 +48,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-purple-700 block">Total GST on Job Work</span>
           <span className="font-mono text-sm font-semibold text-purple-900 block mt-0.5">
-            {formatINR(totals.total_gst)}
+            {formatINR(totals.total_gst, true)}
           </span>
           <span className="text-sm text-purple-600">Applicable ITC</span>
         </div>
@@ -56,7 +56,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-emerald-600 block">Total Payments Disbursed</span>
           <span className="font-mono text-sm font-semibold text-emerald-700 block mt-0.5">
-            {formatINR(totals.total_payments)}
+            {formatINR(totals.total_payments, true)}
           </span>
           <span className="text-sm text-slate-400">Settled to Artisans</span>
         </div>
@@ -64,7 +64,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-rose-500 block">Pending Artisan Dues</span>
           <span className="font-serif-display text-base font-bold text-rose-600 block mt-0.5">
-            {formatINR(totals.total_outstanding)}
+            {formatINR(totals.total_outstanding, true)}
           </span>
           <span className="text-sm text-rose-500/80 font-medium">{artisan_summaries.length} Active Artisans</span>
         </div>
@@ -88,15 +88,15 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
               <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t border-slate-200/60">
                 <div>
                   <span className="text-sm text-slate-400 block">Total Work</span>
-                  <span className="font-mono font-semibold text-slate-800">{formatINR(art.total_job_work_value)}</span>
+                  <span className="font-mono font-semibold text-slate-800">{formatINR(art.total_job_work_value, true)}</span>
                 </div>
                 <div>
                   <span className="text-sm text-slate-400 block">Paid</span>
-                  <span className="font-mono font-semibold text-emerald-700">{formatINR(art.total_payments)}</span>
+                  <span className="font-mono font-semibold text-emerald-700">{formatINR(art.total_payments, true)}</span>
                 </div>
                 <div className="col-span-2 flex justify-between items-center pt-1 border-t border-slate-100">
                   <span className="text-sm text-rose-600 font-medium">Pending Due:</span>
-                  <span className="font-mono font-bold text-rose-600">{formatINR(art.outstanding_amount)}</span>
+                  <span className="font-mono font-bold text-rose-600">{formatINR(art.outstanding_amount, true)}</span>
                 </div>
               </div>
             </div>
@@ -155,16 +155,16 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
                     {item.quantity || 1}
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-medium text-slate-900">
-                    {formatINR(item.job_work_amount)}
+                    {formatINR(item.job_work_amount, true)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-slate-600">
-                    {item.gst > 0 ? formatINR(item.gst) : '—'}
+                    {item.gst > 0 ? formatINR(item.gst, true) : '—'}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-emerald-700">
-                    {formatINR(item.amount_paid)}
+                    {formatINR(item.amount_paid, true)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-rose-600">
-                    {item.outstanding_amount > 0 ? formatINR(item.outstanding_amount) : '—'}
+                    {item.outstanding_amount > 0 ? formatINR(item.outstanding_amount, true) : '—'}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span
@@ -187,10 +187,10 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
             <tfoot className="bg-slate-50 font-bold border-t-2 border-slate-200 text-slate-900">
               <tr>
                 <td className="py-3 px-4" colSpan={4}>Totals ({items.length} Job-Work Bills)</td>
-                <td className="py-3 px-4 text-right font-mono">{formatINR(totals.total_job_work_value)}</td>
-                <td className="py-3 px-4 text-right font-mono">{formatINR(totals.total_gst)}</td>
-                <td className="py-3 px-4 text-right font-mono text-emerald-700">{formatINR(totals.total_payments)}</td>
-                <td className="py-3 px-4 text-right font-mono text-rose-600">{formatINR(totals.total_outstanding)}</td>
+                <td className="py-3 px-4 text-right font-mono">{formatINR(totals.total_job_work_value, true)}</td>
+                <td className="py-3 px-4 text-right font-mono">{formatINR(totals.total_gst, true)}</td>
+                <td className="py-3 px-4 text-right font-mono text-emerald-700">{formatINR(totals.total_payments, true)}</td>
+                <td className="py-3 px-4 text-right font-mono text-rose-600">{formatINR(totals.total_outstanding, true)}</td>
                 <td className="py-3 px-4"></td>
               </tr>
             </tfoot>
@@ -232,7 +232,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
             <div className="grid grid-cols-2 gap-2 text-sm pt-1 border-t border-slate-100">
               <div>
                 <span className="text-sm text-slate-400 block">Job Charge</span>
-                <span className="font-mono font-bold text-slate-900">{formatINR(item.job_work_amount)}</span>
+                <span className="font-mono font-bold text-slate-900">{formatINR(item.job_work_amount, true)}</span>
               </div>
               <div>
                 <span className="text-sm text-slate-400 block">Quantity</span>
@@ -240,11 +240,11 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
               </div>
               <div>
                 <span className="text-sm text-slate-400 block">Paid</span>
-                <span className="font-mono font-medium text-emerald-700">{formatINR(item.amount_paid)}</span>
+                <span className="font-mono font-medium text-emerald-700">{formatINR(item.amount_paid, true)}</span>
               </div>
               <div>
                 <span className="text-sm text-slate-400 block">Remaining Due</span>
-                <span className="font-mono font-bold text-rose-600">{formatINR(item.outstanding_amount)}</span>
+                <span className="font-mono font-bold text-rose-600">{formatINR(item.outstanding_amount, true)}</span>
               </div>
             </div>
           </div>

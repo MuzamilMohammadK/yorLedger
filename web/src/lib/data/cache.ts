@@ -88,6 +88,7 @@ class ShopCache {
   rawBill(id: string) { return this.raw.bills.get(id); }
   rawParty(id: string) { return this.raw.parties.get(id); }
   rawBills() { return [...this.raw.bills.values()].filter(b => !b.deleted_at); }
+  rawReturns() { return [...this.raw.returns.values()]; }
 
   parties(): Party[] {
     if (this.memo.parties) return this.memo.parties;

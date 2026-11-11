@@ -80,7 +80,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             </div>
           </div>
           <span className="font-serif-display text-2xl font-bold text-slate-900 block mt-2">
-            {formatINR(summary.total_taxable_sales)}
+            {formatINR(summary.total_taxable_sales, true)}
           </span>
           <span className="text-sm text-slate-500 mt-1 block">Net outward taxable supplies</span>
         </div>
@@ -93,7 +93,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             </div>
           </div>
           <span className="font-serif-display text-2xl font-bold text-purple-900 block mt-2">
-            {formatINR(summary.output_gst)}
+            {formatINR(summary.output_gst, true)}
           </span>
           <span className="text-sm text-purple-700/80 mt-1 block font-medium">GSTR-1 outward tax liability</span>
         </div>
@@ -106,7 +106,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             </div>
           </div>
           <span className="font-serif-display text-2xl font-bold text-emerald-700 block mt-2">
-            {formatINR(summary.eligible_itc)}
+            {formatINR(summary.eligible_itc, true)}
           </span>
           <span className="text-sm text-emerald-600/80 mt-1 block font-medium">From registered GSTIN purchases</span>
         </div>
@@ -119,7 +119,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             </div>
           </div>
           <span className="font-serif-display text-2xl font-bold text-white block mt-2">
-            {formatINR(summary.net_gst_payable)}
+            {formatINR(summary.net_gst_payable, true)}
           </span>
           <span className="text-sm text-purple-200/80 mt-1 block">
             {summary.output_gst > summary.eligible_itc ? 'Output Tax − Claimable ITC' : 'Credit Balance Available'}
@@ -153,30 +153,30 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
                   Output Tax Liability (Sales)
                 </td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_cgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_sgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_igst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono font-bold text-purple-900">{formatINR(totalOutput)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_cgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_sgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_igst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono font-bold text-purple-900">{formatINR(totalOutput, true)}</td>
               </tr>
               <tr className="hover:bg-slate-50/50">
                 <td className="py-3.5 px-6 font-semibold text-emerald-800 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                   Input Tax Credit (Purchases)
                 </td>
-                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_cgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_sgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_igst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono font-bold text-emerald-700">{formatINR(totalInput)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_cgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_sgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-emerald-700">{formatINR(tax_breakdown.input_igst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono font-bold text-emerald-700">{formatINR(totalInput, true)}</td>
               </tr>
               <tr className="bg-slate-50/90 font-bold border-t-2 border-slate-200">
                 <td className="py-3.5 px-6 text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block" />
                   Net Tax Payable (Challan)
                 </td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netCgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netSgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netIgst)}</td>
-                <td className="py-3.5 px-6 text-right font-mono font-extrabold text-purple-700">{formatINR(netTotal)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netCgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netSgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netIgst, true)}</td>
+                <td className="py-3.5 px-6 text-right font-mono font-extrabold text-purple-700">{formatINR(netTotal, true)}</td>
               </tr>
             </tbody>
           </table>
@@ -195,8 +195,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={charts.monthly_sales_vs_purchases} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
@@ -225,8 +225,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Output GST']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
@@ -253,8 +253,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Eligible ITC']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
@@ -275,8 +275,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={charts.tax_component_comparison} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="component" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="component" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, '']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
@@ -304,8 +304,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={charts.monthly_net_payable_trend} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Net Cash Payable']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}

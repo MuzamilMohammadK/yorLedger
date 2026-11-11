@@ -8,3 +8,4 @@ export * from './dashboard.js';
 export * from './pager.js';
 export * from './statement.js';
 export * from './payment.js';
+export * from './reports.js';
