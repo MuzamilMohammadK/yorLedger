@@ -9,7 +9,7 @@ import {
   CreateBillPayload, CreatePartyPayload, InvoiceSettings, NotificationSettings, AppPreferences,
   Party, PaymentPayload, ReturnPayload, Shop, ShopSettingsData, UpdatePartyPayload,
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, computeTax, computeReturn,
-  normalizeInvoice, normalizePhone, validateGSTIN, getStateCodeByName
+  normalizeInvoice, normalizePhone, validateGSTIN, getStateCodeByName, validatePayment
 } from '@yorbalance/shared';
 import { auth, db } from '../firebase';
 import { cache } from './cache';
@@ -219,18 +219,9 @@ export async function deleteBill(shopId: string, billId: string) {
 // ---------------- Payments ----------------
 
 export async function recordPayment(shopId: string, p: PaymentPayload) {
-  const fields: Record<string, string> = {};
-  if (!Number.isInteger(p.amount) || p.amount <= 0) fields.amount = 'Enter the amount';
-  if (p.mode === 'CASH') {
-    requireDate(p.paid_on, 'paid_on');
-    if (!p.collected_by?.trim()) fields.collected_by = 'Who collected / paid the cash?';
-  } else if (p.mode === 'CHEQUE') {
-    requireDate(p.cheque_date, 'cheque_date');
-  } else {
-    requireDate(p.txn_date, 'txn_date');
-    if (!/^[A-Za-z0-9]{6,22}$/.test(p.utr_no?.trim() ?? '')) fields.utr_no = 'Enter the UTR number (letters and digits)';
-  }
-  if (Object.keys(fields).length) throw new AppError('Please correct the highlighted fields', 'VALIDATION_ERROR', fields);
+  // Same validation as the form (shared), checked again against the live due inside the transaction.
+  const pre = validatePayment(p, Number.MAX_SAFE_INTEGER);
+  if (Object.keys(pre).length) throw new AppError('Please correct the highlighted fields', 'VALIDATION_ERROR', pre);
 
   const billRef = ref(shopId, 'bills', p.bill_id);
   const payRef = doc(col(shopId, 'payments'));
@@ -238,7 +229,7 @@ export async function recordPayment(shopId: string, p: PaymentPayload) {
     const b = await tx.get(billRef);
     if (!b.exists() || b.data().deleted_at) throw new AppError('Bill not found', 'NOT_FOUND', undefined, 404);
     const bill = b.data();
-    if (p.amount > bill.amount_due) {
+    if (validatePayment(p, bill.amount_due).amount) {
       throw new AppError(`Amount is more than the due (₹${(bill.amount_due / 100).toLocaleString('en-IN')})`,
         'AMOUNT_EXCEEDS_DUE', { amount: 'More than due' });
     }

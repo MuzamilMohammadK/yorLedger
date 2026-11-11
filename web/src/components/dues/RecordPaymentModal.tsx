@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Banknote, Landmark, Receipt, Loader2, AlertTriangle, Camera } from 'lucide-react';
-import { Party, PaymentPayload, Transaction, formatPaiseToINR, parsePaymentText } from '@yorbalance/shared';
+import { Party, PaymentPayload, Transaction, formatPaiseToINR, parsePaymentText, validatePayment } from '@yorbalance/shared';
 import { readImage } from '../../lib/ocr';
 import { api, ApiError } from '../../lib/api';
 import { useI18n } from '../../i18n';
@@ -110,19 +110,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const save = async () => {
     if (!bill) return;
-    const errs: Record<string, string> = {};
-    if (!paise) errs.amount = t('required');
-    else if (tooMuch) errs.amount = t('more_than_due');
-    if (mode === 'CASH' && !collectedBy.trim()) errs.collected_by = t('required');
-    if (mode === 'NEFT' && !utr.trim()) errs.utr_no = t('required');
+    if (!paise) { setErrors({ amount: t('required') }); return; }
+    let payload: PaymentPayload;
+    if (mode === 'CASH') payload = { mode, bill_id: bill.id, amount: paise, paid_on: date, collected_by: collectedBy, notes };
+    else if (mode === 'CHEQUE') payload = { mode, bill_id: bill.id, amount: paise, cheque_no: chequeNo, cheque_date: date,
+                                            deposit_date: depositDate || null, clearing_date: clearingDate || null, notes };
+    else payload = { mode, bill_id: bill.id, amount: paise, utr_no: utr, txn_date: date, notes };
+    // Same validation as the save (shared/payment.ts).
+    const errs = validatePayment(payload, bill.pending_paise);
+    if (errs.amount && paise > bill.pending_paise) errs.amount = t('more_than_due');
+    if (errs.collected_by) errs.collected_by = t('required');
+    if (errs.utr_no) errs.utr_no = t('required');
     setErrors(errs);
     if (Object.keys(errs).length) return;
-
-    let payload: PaymentPayload;
-    if (mode === 'CASH') payload = { mode, bill_id: bill.id, amount: paise!, paid_on: date, collected_by: collectedBy, notes };
-    else if (mode === 'CHEQUE') payload = { mode, bill_id: bill.id, amount: paise!, cheque_no: chequeNo, cheque_date: date,
-                                            deposit_date: depositDate || null, clearing_date: clearingDate || null, notes };
-    else payload = { mode, bill_id: bill.id, amount: paise!, utr_no: utr, txn_date: date, notes };
 
     setBusy(true);
     setFormError(null);
