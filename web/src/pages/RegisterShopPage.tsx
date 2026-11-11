@@ -46,7 +46,6 @@ export const RegisterShopPage: React.FC = () => {
       if (f.password.length < 8) e.password = t('password_min');
       if (f.password !== f.confirm_password) e.confirm_password = t('passwords_differ');
     }
-    if (!docs.GST_CERTIFICATE?.upload) e['documents.GST_CERTIFICATE'] = t('doc_required');
     setErrors(e);
     return !Object.keys(e).length;
   };

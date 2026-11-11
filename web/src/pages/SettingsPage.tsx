@@ -18,6 +18,7 @@ const SECTIONS: { id: Section; key: string; icon: typeof Store }[] = [
 ];
 const APP_VERSION = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? 'dev';
 const REPO = 'https://github.com/MuzamilMohammadK/yorLedger';
+const SUPPORT_PHONES = ['7893178596', '9381870544'];
 
 /** §12 Settings: eight sections; every control saves and takes effect. */
 export const SettingsPage: React.FC = () => {
@@ -265,7 +266,12 @@ export const SettingsPage: React.FC = () => {
             <div className="space-y-4">
               {info('YorLedger', t('tagline'))}
               {info(t('version'), APP_VERSION)}
-              {info(t('developer'), 'YorLedger')}
+              {info(t('developer'), 'Poelys')}
+              {info(t('help_support'), (
+                <span className="flex flex-col items-end">
+                  {SUPPORT_PHONES.map(p => <a key={p} href={`tel:+91${p}`} className="text-indigo-700 underline">+91 {p.slice(0, 5)} {p.slice(5)}</a>)}
+                </span>
+              ))}
               <section><h3 className="text-base font-bold text-slate-900">{t('terms_title')}</h3><p className="text-base text-slate-700">{t('terms_body')}</p></section>
               <section><h3 className="text-base font-bold text-slate-900">{t('privacy_title')}</h3><p className="text-base text-slate-700">{t('privacy_info')}</p></section>
               <section>

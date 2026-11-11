@@ -617,8 +617,8 @@ export interface ReturnPayload {
 // ---------------------------------------------------------------------------
 export type ShopDocumentType = 'GST_CERTIFICATE' | 'ADDRESS_PROOF' | 'OWNERSHIP_PROOF' | 'SHOP_FRONT_PHOTO';
 export const SHOP_DOCUMENT_TYPES: ShopDocumentType[] = ['GST_CERTIFICATE', 'ADDRESS_PROOF', 'OWNERSHIP_PROOF', 'SHOP_FRONT_PHOTO'];
-/** Product decision (spec says confirm): GST certificate is mandatory, the rest optional. */
-export const REQUIRED_SHOP_DOCUMENTS: ShopDocumentType[] = ['GST_CERTIFICATE'];
+/** Product decision (owner, 2026-11-11): all verification documents are optional for now. */
+export const REQUIRED_SHOP_DOCUMENTS: ShopDocumentType[] = [];
 
 export interface ShopDocument {
   type: ShopDocumentType;
