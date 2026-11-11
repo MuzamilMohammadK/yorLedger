@@ -323,7 +323,7 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
                   </label>
                   <div className="text-right">
                     <span className="block text-sm text-slate-600">{t('line_total')}</span>
-                    <span className="block h-12 leading-[3rem] text-base font-bold text-slate-900">{rs(line)}</span>
+                    <span className="block h-12 leading-[3rem] text-sm sm:text-base font-bold text-slate-900 break-all">{rs(line)}</span>
                   </div>
                 </div>
                 {(errors[`items.${i}.qty`] || errors[`items.${i}.rate`]) && <p className="text-sm text-rose-600">{t('required')}</p>}

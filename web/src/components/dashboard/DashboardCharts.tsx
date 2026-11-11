@@ -43,9 +43,9 @@ export const DashboardCharts: React.FC<{ series: DashboardSeries }> = ({ series 
             <YAxis tickFormatter={rupeeAxis} tick={{ fontSize: 12 }} width={44} />
             <Tooltip formatter={(v: any) => moneyTip(Number(v))} />
             <Legend />
-            <Bar dataKey="salesR" name={t('sales')} fill={C.sales} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="purchasesR" name={t('purchases')} fill={C.purchases} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="jobR" name={t('job_work')} fill={C.job} radius={[4, 4, 0, 0]} />
+            <Bar isAnimationActive={false} dataKey="salesR" name={t('sales')} fill={C.sales} radius={[4, 4, 0, 0]} />
+            <Bar isAnimationActive={false} dataKey="purchasesR" name={t('purchases')} fill={C.purchases} radius={[4, 4, 0, 0]} />
+            <Bar isAnimationActive={false} dataKey="jobR" name={t('job_work')} fill={C.job} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </Card>
@@ -57,7 +57,7 @@ export const DashboardCharts: React.FC<{ series: DashboardSeries }> = ({ series 
             <XAxis dataKey="label" tick={{ fontSize: 12 }} interval="preserveStartEnd" />
             <YAxis tickFormatter={rupeeAxis} tick={{ fontSize: 12 }} width={44} />
             <Tooltip formatter={(v: any) => moneyTip(Number(v))} />
-            <Line type="monotone" dataKey="salesR" name={t('sales')} stroke={C.sales} strokeWidth={3} dot={false} />
+            <Line isAnimationActive={false} type="monotone" dataKey="salesR" name={t('sales')} stroke={C.sales} strokeWidth={3} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
@@ -65,7 +65,7 @@ export const DashboardCharts: React.FC<{ series: DashboardSeries }> = ({ series 
       <Card title={t('chart_pvs')}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={donut} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
+            <Pie isAnimationActive={false} data={donut} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
               {donut.map(d => <Cell key={d.name} fill={d.color} />)}
             </Pie>
             <Tooltip formatter={(v: any, _n: any, p: any) => `${v} · ${rs(p.payload.amount)}`} />
@@ -81,7 +81,7 @@ export const DashboardCharts: React.FC<{ series: DashboardSeries }> = ({ series 
             <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={88} />
             <Tooltip />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+            <Bar isAnimationActive={false} dataKey="value" radius={[0, 4, 4, 0]}>
               {types.map(d => <Cell key={d.name} fill={d.color} />)}
             </Bar>
           </BarChart>

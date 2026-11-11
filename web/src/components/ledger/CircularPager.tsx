@@ -96,7 +96,7 @@ export const CircularPager: React.FC<{ views: View[]; index: number; onIndexChan
       <div role="tablist" className="grid gap-2 mb-2" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
         {views.map((v, i) => (
           <button key={v.id} role="tab" aria-selected={i === cur} aria-controls={`pane-${v.id}`} onClick={() => onIndexChange(index + (i - cur))}
-            className={`h-12 rounded-xl text-base font-bold flex items-center justify-center gap-2 ${i === cur ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+            className={`h-12 min-w-0 px-1 rounded-xl text-sm sm:text-base font-bold flex items-center justify-center gap-2 [&>svg]:hidden sm:[&>svg]:block ${i === cur ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
             {v.icon}{v.label}
           </button>
         ))}

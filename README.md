@@ -39,6 +39,16 @@ shops/{shopId}/audit/{id}
 shops/{shopId}/settings/{doc}
 ```
 
+## Tests (§19)
+
+| Suite | What | Where |
+| --- | --- | --- |
+| `npm test` | Shared domain: tax split, rounding, returns (incl. 200,000 / 100 / 50), invoice / phone / GSTIN, payments, dashboard, reports, scanning parsers | anywhere |
+| `npm run test:rules` | Firestore security rules on the emulator: tenant isolation, approval gate, duplicate SALE invoice, payment ≤ due, unique UTR, immutable snapshots, append-only audit | needs Java + firebase-tools |
+| `npm run test:e2e` | Playwright, phone + desktop: register → admin approval → parties → sale / purchase / job work → return → cash / cheque / NEFT → dues → reports → notifications → settings | after an emulator build (see `.github/workflows/ci.yml`) |
+
+CI runs all three on every push, and uploads screenshots of every screen as the `e2e-screens-and-report` artifact.
+
 ## Run locally
 
 ```bash

@@ -161,7 +161,7 @@ export const DuesPage: React.FC = () => {
                   </div>
                   <span className={`shrink-0 px-2 py-1 rounded-full text-sm font-bold ${BADGE[st]}`}>{t(`status_${st}` as any)}</span>
                 </div>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-sm text-slate-600">
+                <div className="mt-2 grid grid-cols-3 gap-2 text-sm text-slate-600 [&_b]:text-sm sm:[&_b]:text-base [&_b]:break-all [&>span]:min-w-0">
                   <span>{t('bill_total')}<b className="block text-base text-slate-900">{rs(b.grand_total_paise)}</b></span>
                   <span>{t('returned')}<b className="block text-base text-slate-900">{rs(b.return_paise ?? 0)}</b></span>
                   <span>{t('paid')}<b className="block text-base text-slate-900">{rs(b.paid_paise)}</b></span>

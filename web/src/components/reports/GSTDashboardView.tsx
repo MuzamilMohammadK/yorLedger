@@ -53,10 +53,11 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
 
   const totalOutput = tax_breakdown.output_cgst + tax_breakdown.output_sgst + tax_breakdown.output_igst;
   const totalInput = tax_breakdown.input_cgst + tax_breakdown.input_sgst + tax_breakdown.input_igst;
-  const netCgst = Math.max(0, tax_breakdown.output_cgst - tax_breakdown.input_cgst);
-  const netSgst = Math.max(0, tax_breakdown.output_sgst - tax_breakdown.input_sgst);
-  const netIgst = Math.max(0, tax_breakdown.output_igst - tax_breakdown.input_igst);
-  const netTotal = Math.max(0, totalOutput - totalInput);
+  // Signed per component (negative = more input credit than output tax); they add up to the total.
+  const netCgst = tax_breakdown.output_cgst - tax_breakdown.input_cgst;
+  const netSgst = tax_breakdown.output_sgst - tax_breakdown.input_sgst;
+  const netIgst = tax_breakdown.output_igst - tax_breakdown.input_igst;
+  const netTotal = totalOutput - totalInput;
 
   return (
     <div className="space-y-6">
@@ -64,7 +65,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
       <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3 text-amber-900 shadow-xs">
         <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
         <div className="text-sm leading-relaxed">
-          <strong className="font-semibold block text-amber-950 mb-0.5">Statutory GST Disclaimer:</strong>
+          <strong className="font-semibold block text-amber-950 mb-0.5">Please note:</strong>
           {disclaimer ||
             'GST analytics and tax calculations shown in YorLedger are accounting summaries and must not be presented as proof that a GST return has been filed. All figures must be reviewed and reconciled with your physical invoices by your chartered accountant or GST tax consultant prior to filing GSTR-1, GSTR-3B, or CMP-08.'}
         </div>
@@ -95,7 +96,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
           <span className="font-serif-display text-2xl font-bold text-purple-900 block mt-2">
             {formatINR(summary.output_gst, true)}
           </span>
-          <span className="text-sm text-purple-700/80 mt-1 block font-medium">GSTR-1 outward tax liability</span>
+          <span className="text-sm text-purple-700/80 mt-1 block font-medium">GST on sales, after returns</span>
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs relative overflow-hidden group">
@@ -171,7 +172,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               <tr className="bg-slate-50/90 font-bold border-t-2 border-slate-200">
                 <td className="py-3.5 px-6 text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block" />
-                  Net Tax Payable (Challan)
+                  Net (output − input credit)
                 </td>
                 <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netCgst, true)}</td>
                 <td className="py-3.5 px-6 text-right font-mono text-slate-900">{formatINR(netSgst, true)}</td>
@@ -189,7 +190,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Sales vs Purchases (₹)</h4>
-            <span className="text-sm text-slate-400">Turnover Velocity</span>
+            <span className="text-sm text-slate-400"></span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -202,8 +203,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                <Bar dataKey="sales" name="Sales Turnover" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="purchases" name="Purchases" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={false} dataKey="sales" name="Sales Turnover" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={false} dataKey="purchases" name="Purchases" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -213,7 +214,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Output GST Liability Trend (₹)</h4>
-            <span className="text-sm text-purple-600 font-medium">GSTR-1 Trend</span>
+            <span className="text-sm text-purple-600 font-medium"></span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -231,7 +232,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Output GST']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 />
-                <Area type="monotone" dataKey="output_gst" stroke="#7c3aed" strokeWidth={2.5} fillOpacity={1} fill="url(#outputTaxGrad)" />
+                <Area isAnimationActive={false} type="monotone" dataKey="output_gst" stroke="#7c3aed" strokeWidth={2.5} fillOpacity={1} fill="url(#outputTaxGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -241,7 +242,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Input Tax Credit (ITC) Trend (₹)</h4>
-            <span className="text-sm text-emerald-600 font-medium">GSTR-2B Inflow</span>
+            <span className="text-sm text-emerald-600 font-medium"></span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -259,7 +260,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   formatter={(value: any) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Eligible ITC']}
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 />
-                <Area type="monotone" dataKey="eligible_itc" stroke="#059669" strokeWidth={2.5} fillOpacity={1} fill="url(#itcGrad)" />
+                <Area isAnimationActive={false} type="monotone" dataKey="eligible_itc" stroke="#059669" strokeWidth={2.5} fillOpacity={1} fill="url(#itcGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -269,7 +270,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-serif-display text-sm font-bold text-slate-900">CGST / SGST / IGST Tax Heads Comparison (₹)</h4>
-            <span className="text-sm text-slate-400">Jurisdiction Balance</span>
+            <span className="text-sm text-slate-400"></span>
           </div>
           <div className="h-60 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -282,8 +283,8 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
                   contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                <Bar dataKey="output" name="Output Tax" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="input" name="Input Credit" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={false} dataKey="output" name="Output Tax" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                <Bar isAnimationActive={false} dataKey="input" name="Input Credit" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -293,11 +294,11 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Net GST Cash Challan Payable (₹)</h4>
+              <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly net GST payable (₹)</h4>
               <p className="text-sm text-slate-400">Net tax after offsetting eligible ITC from output sales tax</p>
             </div>
             <span className="text-sm font-mono font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
-              GSTR-3B Net Cash
+              Net payable
             </span>
           </div>
           <div className="h-64 w-full">
