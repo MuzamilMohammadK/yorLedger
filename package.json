@@ -12,6 +12,12 @@
     "build": "npm run build --workspace=shared && npm run build --workspace=web",
     "test": "npm run build --workspace=shared && npm test --workspace=shared",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
-    "deploy:web": "npm run build && firebase deploy --only hosting"
+    "deploy:web": "npm run build && firebase deploy --only hosting",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-yorledger \"node --test tests/rules/\"",
+    "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-yorledger \"npx playwright test -c tests/e2e/playwright.config.ts\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "@playwright/test": "^1.64.1"
   }
 }

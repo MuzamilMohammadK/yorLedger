@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, ShoppingBag, Truck, Scissors, Loader2, CheckCircle2, ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Search, UserPlus, Camera, FileText, Share2 } from 'lucide-react';
 import { BillKind, Party, Transaction, computeTax, formatPaiseToINR, getStateByCode, normalizeInvoice } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
@@ -78,6 +78,7 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   const [saved, setSaved] = useState<Transaction | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const checkTimer = useRef<number | undefined>(undefined);
+  const uid = useId();
 
   // Default reminder lead time comes from Settings → Notifications (§12.6).
   useEffect(() => {
@@ -277,8 +278,8 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-base font-semibold text-slate-800 mb-1">{t('bill_no')}</label>
-          <input inputMode="numeric" value={invoiceNo}
+          <label htmlFor={`${uid}-bill-no`} className="block text-base font-semibold text-slate-800 mb-1">{t('bill_no')}</label>
+          <input id={`${uid}-bill-no`} inputMode="numeric" value={invoiceNo}
             onChange={e => setInvoiceNo(e.target.value.replace(/\D/g, ''))}
             onPaste={e => { e.preventDefault(); setInvoiceNo((invoiceNo + e.clipboardData.getData('text')).replace(/\D/g, '')); }}
             onBlur={() => { const n = normalizeInvoice(invoiceNo); setInvoiceNo(n ? String(n) : invoiceNo.replace(/^0+/, '')); }}
@@ -290,8 +291,8 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
           {err('invoice_no')}
         </div>
         <div>
-          <label className="block text-base font-semibold text-slate-800 mb-1">{t('date')}</label>
-          <input type="date" value={billDate} max={todayIST()} onChange={e => setBillDate(e.target.value)} className={field} />
+          <label htmlFor={`${uid}-bill-date`} className="block text-base font-semibold text-slate-800 mb-1">{t('date')}</label>
+          <input id={`${uid}-bill-date`} type="date" value={billDate} max={todayIST()} onChange={e => setBillDate(e.target.value)} className={field} />
         </div>
       </div>
 

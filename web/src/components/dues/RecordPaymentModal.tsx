@@ -180,8 +180,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-base font-semibold text-slate-800 mb-1">{t('amount')} ₹</label>
-              <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+              <label htmlFor="pay-amount" className="block text-base font-semibold text-slate-800 mb-1">{t('amount')} ₹</label>
+              <input id="pay-amount" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
                 className={`${field} text-2xl font-bold h-14 ${tooMuch ? 'border-rose-500' : ''}`} />
               {tooMuch && <p className="mt-1 text-sm text-rose-600">{t('more_than_due')}</p>}
               {err('amount')}

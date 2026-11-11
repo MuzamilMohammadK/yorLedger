@@ -24,3 +24,7 @@ service-account*.json
 web/public/ocr/
 # Tesseract cache written by local node runs
 *.traineddata
+
+# Playwright output
+test-results/
+playwright-report/

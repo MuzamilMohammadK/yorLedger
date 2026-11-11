@@ -11,8 +11,10 @@ import {
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  connectFirestoreEmulator
 } from 'firebase/firestore';
+import { connectAuthEmulator } from 'firebase/auth';
 
 // Firebase web config identifies the project; it is not a secret (access is
 // controlled by firestore.rules). Values come from web/.env.production.
@@ -38,6 +40,12 @@ export const db = initializeFirestore(app, {
   ignoreUndefinedProperties: true,
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+
+// Test builds only (VITE_USE_EMULATORS=true): talk to the local Firebase emulators.
+if (import.meta.env.VITE_USE_EMULATORS === 'true') {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 
 export {
   signInWithEmailAndPassword,
