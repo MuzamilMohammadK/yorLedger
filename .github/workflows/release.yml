@@ -51,8 +51,8 @@ jobs:
           KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
           else
             echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — APK is signed with the debug key."
           fi
@@ -69,6 +69,13 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease -PversionName="$V" -PversionCode="$CODE"
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/YorLedger-$V.apk"
+      - name: Verify APK signature
+        run: |
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$SIGNER" verify --print-certs "YorLedger-${VERSION#v}.apk" | tee signer.txt
+          if [ -n "$ANDROID_KEYSTORE_PATH" ] && ! grep -q "CN=YorLedger" signer.txt; then
+            echo "::error::APK is not signed with the YorLedger release key"; exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with: { name: out-android, path: 'YorLedger-*.apk' }
 
