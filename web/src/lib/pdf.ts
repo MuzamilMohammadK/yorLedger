@@ -2,7 +2,7 @@
 // rupee glyph, so amounts print as "Rs." to stay readable everywhere.
 import type { Shop, Transaction } from '@yorbalance/shared';
 import { cache } from './data/cache';
-import { shareFile } from './platform';
+import { isAndroidApp, isDesktopApp, shareFile } from './platform';
 
 const TITLE: Record<string, string> = { SALE: 'TAX INVOICE', PURCHASE: 'PURCHASE BILL', JOB_WORK: 'JOB WORK BILL' };
 
@@ -104,4 +104,22 @@ export async function shareBillPdf(shop: Shop, bill: Transaction) {
   const blob = await buildBillPdf(shop, bill);
   const kind = bill.type === 'SALE' ? 'Bill' : bill.type === 'PURCHASE' ? 'Purchase' : 'JobWork';
   await shareFile(blob, `${kind}-${bill.invoice_number}-${bill.party_name.replace(/[^A-Za-z0-9]+/g, '_')}.pdf`, `${kind} ${bill.invoice_number}`);
+}
+
+/** Open the bill PDF for viewing (§8.3: after saving, open the generated bill). */
+export async function openBillPdf(shop: Shop, bill: Transaction) {
+  const blob = await buildBillPdf(shop, bill);
+  if (isAndroidApp || isDesktopApp) {
+    // Android web view cannot show PDFs; the desktop app blocks new windows: share / save instead.
+    return shareBillPdf(shop, bill);
+  }
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Object URL for an inline preview (website / desktop). Caller revokes it. */
+export async function billPdfUrl(shop: Shop, bill: Transaction): Promise<string | null> {
+  if (isAndroidApp) return null;
+  return URL.createObjectURL(await buildBillPdf(shop, bill));
 }

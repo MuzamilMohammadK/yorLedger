@@ -14,6 +14,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { PartiesPage } from './pages/PartiesPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { LedgerPage } from './pages/LedgerPage';
 import { DuesPage } from './pages/DuesPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -42,7 +43,7 @@ export const App: React.FC = () => {
               <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/parties" element={<PartiesPage />} />
-                <Route path="/ledger" element={<Navigate to="/history" replace />} />
+                <Route path="/ledger" element={<LedgerPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/dues" element={<DuesPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
