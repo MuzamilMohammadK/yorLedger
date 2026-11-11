@@ -86,6 +86,19 @@ class ShopCache {
   }
 
   rawBill(id: string) { return this.raw.bills.get(id); }
+
+  /**
+   * Firestore transactions are not applied to the local cache until the server confirms
+   * and the listener delivers them. Wait until `ready(bill)` is true (default: bill exists).
+   */
+  waitForBill(id: string, ready: (b: Record<string, any>) => boolean = () => true, timeoutMs = 15000): Promise<void> {
+    const ok = () => { const b = this.raw.bills.get(id); return !!b && ready(b); };
+    if (ok()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = window.setTimeout(() => { unsub(); reject(new Error('Saved, but the screen did not refresh. Please reopen this page.')); }, timeoutMs);
+      const unsub = this.subscribe(() => { if (ok()) { window.clearTimeout(timer); unsub(); resolve(); } });
+    });
+  }
   rawParty(id: string) { return this.raw.parties.get(id); }
   rawBills() { return [...this.raw.bills.values()].filter(b => !b.deleted_at); }
   rawReturns() { return [...this.raw.returns.values()]; }

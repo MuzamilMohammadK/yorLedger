@@ -129,6 +129,7 @@ export const api = {
   createBill: async (payload: CreateBillPayload) => {
     const s = await shopReady();
     const bill = await ledger.createBill(s, payload);
+    await cache.waitForBill(bill.id);
     return { message: 'Bill saved', transaction: compute.getTransactionHistoryDetails(s.id, bill.id)! };
   },
   /** Next free SALE number: one above the highest used, or the "suggested next number" setting if higher (§12.5). */
@@ -208,7 +209,9 @@ export const api = {
   },
   recordPayment: async (payload: PaymentPayload) => {
     const s = await shopReady();
+    const before = cache.rawBill(payload.bill_id)?.paid_total ?? 0;
     const id = await ledger.recordPayment(s.id, payload);
+    await cache.waitForBill(payload.bill_id, b => b.paid_total >= before + payload.amount);
     return { message: 'Payment saved', paymentId: id, transaction: compute.getTransactionHistoryDetails(s.id, payload.bill_id) };
   },
   updateChequeStatus: async (paymentId: string, patch: Parameters<typeof ledger.updateChequeStatus>[2]) => {
@@ -217,7 +220,9 @@ export const api = {
   },
   recordReturn: async (payload: ReturnPayload) => {
     const s = await shopReady();
+    const before = cache.rawBill(payload.bill_id)?.returned_total ?? 0;
     const id = await ledger.recordReturn(s.id, payload);
+    await cache.waitForBill(payload.bill_id, b => b.returned_total > before);
     return { message: 'Return saved', returnId: id, transaction: compute.getTransactionHistoryDetails(s.id, payload.bill_id)! };
   },
 

@@ -170,7 +170,10 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
         setFormError(e.message);
         if (e.fields) setErrors(e.fields);
         if (e.code === 'DUPLICATE_INVOICE') { setInvoiceState('used'); setNextFree(await api.nextSaleInvoiceNo()); }
-      } else setFormError(navigator.onLine ? t('error_generic') : t('error_offline'));
+      } else {
+        console.error('Saving the bill failed', e);
+        setFormError(navigator.onLine ? t('error_generic') : t('error_offline'));
+      }
     } finally {
       setBusy(false);
     }

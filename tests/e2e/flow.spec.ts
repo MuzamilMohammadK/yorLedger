@@ -42,6 +42,9 @@ test('complete shop journey', async ({ browser }, info) => {
   const adminEmail = `admin-${tag}-${Date.now()}@shop.test`;
   const shopName = `Sri Lakshmi Silks ${tag}`;
   const owner = await (await browser.newContext({ ...info.project.use })).newPage();
+  // Surface app errors in the CI log.
+  owner.on('console', m => { if (m.type() === 'error') console.log(`[browser ${tag}] ${m.text()}`); });
+  owner.on('pageerror', e => console.log(`[pageerror ${tag}] ${e.message}`));
 
   await test.step('1. register shop', async () => {
     await owner.goto('/#/register-shop');
