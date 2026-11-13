@@ -3,9 +3,10 @@
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const out = new URL('../public/ocr/', import.meta.url).pathname;
+const out = fileURLToPath(new URL('../public/ocr/', import.meta.url));
 mkdirSync(out, { recursive: true });
 
 const tess = dirname(require.resolve('tesseract.js/package.json'));
