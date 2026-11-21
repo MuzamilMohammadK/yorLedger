@@ -342,11 +342,15 @@ export const compute = {
         tList = tList.filter(t => t.type === options.type);
       }
       items.push(...tList.map(t => {
-        const remainingPaise = Math.max(0, t.grand_total_paise - (t.return_paise || 0) - t.paid_paise);
+        const totalPaidPaise = (t.payments && t.payments.length > 0)
+          ? t.payments.reduce((sum, p) => sum + (p.amount_paise || 0), 0)
+          : (t.paid_paise || 0);
+        const returnPaise = t.return_paise || 0;
+        const remainingPaise = Math.max(0, t.grand_total_paise - returnPaise - totalPaidPaise);
         let status = t.status;
         if (remainingPaise === 0) status = 'SETTLED';
+        else if (totalPaidPaise > 0 || returnPaise > 0) status = 'PARTIAL';
         else if (t.due_date && t.due_date < todayIST()) status = 'OVERDUE';
-        else if (t.paid_paise > 0 || (t.return_paise && t.return_paise > 0)) status = 'PARTIAL';
         else status = 'PENDING';
 
         return {
@@ -361,10 +365,10 @@ export const compute = {
           party_type: t.party_type,
           grand_total_paise: t.grand_total_paise,
           amount_rupees: Math.round(t.grand_total_paise / 100),
-          paid_paise: t.paid_paise,
-          paid_rupees: Math.round(t.paid_paise / 100),
-          return_paise: t.return_paise || 0,
-          return_rupees: Math.round((t.return_paise || 0) / 100),
+          paid_paise: totalPaidPaise,
+          paid_rupees: Math.round(totalPaidPaise / 100),
+          return_paise: returnPaise,
+          return_rupees: Math.round(returnPaise / 100),
           pending_paise: remainingPaise,
           remaining_due_rupees: Math.round(remainingPaise / 100),
           status,
@@ -382,8 +386,43 @@ export const compute = {
       }));
     }
 
-    if (!options?.type || options.type === 'ALL' || options.type === 'PAYMENT') {
+    if (options?.type === 'PAYMENT') {
+      // Under the Money tab, list receipts
       items.push(...payments.map(p => ({
+        id: p.id,
+        item_kind: 'PAYMENT',
+        type: 'PAYMENT',
+        invoice_number: p.reference_number || (p.cheque_number ? `CHQ-${p.cheque_number}` : `RCP-${p.id.slice(-6).toUpperCase()}`),
+        invoice_date: p.payment_date,
+        due_date: null,
+        party_id: p.party_id,
+        party_name: p.party_name || 'Party',
+        party_type: p.party_type || 'CUSTOMER',
+        grand_total_paise: p.amount_paise,
+        amount_rupees: p.amount_rupees,
+        paid_paise: p.amount_paise,
+        paid_rupees: p.amount_rupees,
+        return_paise: 0,
+        return_rupees: 0,
+        pending_paise: 0,
+        remaining_due_rupees: 0,
+        status: 'SETTLED',
+        subtotal_paise: p.amount_paise,
+        tax_paise: 0,
+        cgst_paise: 0,
+        sgst_paise: 0,
+        igst_paise: 0,
+        notes: p.notes,
+        payment_mode: p.payment_mode,
+        reference_number: p.reference_number,
+        cheque_number: p.cheque_number,
+        transaction_id: p.transaction_id,
+        created_at: p.created_at
+      })));
+    } else if (!options?.type || options.type === 'ALL') {
+      // In the "ALL" view, only unlinked money receipts (not linked to any bill) appear as separate rows.
+      // Bill payments appear inside the bill dropdown instead of creating separate rows (§3).
+      items.push(...payments.filter(p => !p.transaction_id).map(p => ({
         id: p.id,
         item_kind: 'PAYMENT',
         type: 'PAYMENT',

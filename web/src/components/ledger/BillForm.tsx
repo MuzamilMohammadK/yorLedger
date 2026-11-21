@@ -8,8 +8,16 @@ import { todayIST } from '../../lib/data/util';
 import { billMessage, openWhatsApp } from '../../lib/whatsapp';
 import { billPdfUrl, openBillPdf, shareBillPdf } from '../../lib/pdf';
 
+/** Validate an HSN code: digits only, 4–8 characters. Returns error string or null. */
+function validateHsn(v: string): string | null {
+  if (!v) return null; // optional
+  if (!/^\d+$/.test(v)) return 'HSN code must contain digits only';
+  if (v.length < 4 || v.length > 8) return 'HSN code must be 4–8 digits';
+  return null;
+}
+
 export interface DraftItem { name: string; qty: string; rate: string }
-export interface DraftBill { kind: BillKind; partyId: string; invoiceNo: string; billDate: string; items: DraftItem[]; gstPercent: string }
+export interface DraftBill { kind: BillKind; partyId: string; invoiceNo: string; billDate: string; items: DraftItem[]; gstPercent: string; hsnCode?: string }
 
 const KIND_FOR_PARTY: Record<Party['type'], BillKind> = { CUSTOMER: 'SALE', SUPPLIER: 'PURCHASE', ARTISAN: 'JOB_WORK' };
 const KIND_UI: Record<BillKind, { icon: typeof ShoppingBag; on: string }> = {
@@ -40,10 +48,17 @@ interface Props {
   onNewParty?: () => void;
 }
 
+/** Map bill kind → allowed party types (for filtering the party dropdown). */
+const ALLOWED_PARTY_TYPES: Record<BillKind, Party['type'][]> = {
+  SALE: ['CUSTOMER'],
+  PURCHASE: ['SUPPLIER'],
+  JOB_WORK: ['ARTISAN'],
+};
+
 /**
- * §8.3 bill entry: single party search, party state drives the tax preview, digits-only
- * invoice (filters typing and paste, strips leading zeros on blur, rejects zero), SALE
- * availability check after 400 ms, item rows + Add Another Item, live CGST/SGST/IGST and
+ * §8.3 bill entry: party filtered by kind (SALE→CUSTOMER, PURCHASE→SUPPLIER, JOB_WORK→ARTISAN),
+ * max-3-row scrollable dropdown, invoice prefix from Settings prepended to SALE bills,
+ * HSN code field (optional, 4–8 digits), item rows + Add Another Item, live CGST/SGST/IGST and
  * total from the same shared function the save uses, then the bill PDF with share actions.
  */
 export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE', 'JOB_WORK'], partyId: partyProp, onPartyChange, draft, onSaved, onDone, onScan, onNewParty }) => {
@@ -67,6 +82,8 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   const [items, setItems] = useState<DraftItem[]>(draft?.items?.length ? draft.items : [emptyItem()]);
   const [gstPercent, setGstPercent] = useState(draft?.gstPercent ?? defaultGst);
   const [taxOverride, setTaxOverride] = useState<'' | 'INTRA' | 'INTER'>('');
+  const [hsnCode, setHsnCode] = useState(draft?.hsnCode ?? '');
+  const [hsnError, setHsnError] = useState<string | null>(null);
   const [remindOn, setRemindOn] = useState('');
   const [leadDays, setLeadDays] = useState<0 | 1 | 3 | 7>(3);
   const [notes, setNotes] = useState('');
@@ -77,12 +94,16 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   const [nextFree, setNextFree] = useState<number | null>(null);
   const [saved, setSaved] = useState<Transaction | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [invoicePrefix, setInvoicePrefix] = useState('');
   const checkTimer = useRef<number | undefined>(undefined);
   const uid = useId();
 
-  // Default reminder lead time comes from Settings → Notifications (§12.6).
+  // Load Settings for lead time and invoice prefix.
   useEffect(() => {
-    api.getShopSettings().then(s => setLeadDays(s.notification_settings.reminder_lead_time_days)).catch(() => undefined);
+    api.getShopSettings().then(s => {
+      setLeadDays(s.notification_settings.reminder_lead_time_days);
+      setInvoicePrefix(s.invoice_settings.invoice_prefix ?? '');
+    }).catch(() => undefined);
   }, []);
 
   // Suggest the next free SALE number.
@@ -91,13 +112,22 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const party = parties.find(p => p.id === partyId);
+
+  // Filter parties by the allowed types for the current kind (§1.1 / §2.1).
+  const allowedTypes = ALLOWED_PARTY_TYPES[kind];
+  const filteredParties = useMemo(() => parties.filter(p => allowedTypes.includes(p.type)), [parties, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Empty state label per kind.
+  const noPartyLabel = kind === 'SALE' ? 'No customers found' : kind === 'PURCHASE' ? 'No suppliers found' : 'No artisans found';
+
+  // Party search within type-filtered list (max 3 displayed, scrollable).
   const matches = useMemo(() => {
     const q = partyQuery.trim().toLowerCase();
     const digits = q.replace(/\D/g, '');
-    const list = q ? parties.filter(p => p.name.toLowerCase().includes(q) || p.owner_name?.toLowerCase().includes(q) ||
-      (digits.length >= 3 && [p.phone, ...(p.additional_phones ?? [])].some(x => x.includes(digits)))) : parties;
-    return list.slice(0, 6);
-  }, [parties, partyQuery]);
+    const list = q ? filteredParties.filter(p => p.name.toLowerCase().includes(q) || p.owner_name?.toLowerCase().includes(q) ||
+      (digits.length >= 3 && [p.phone, ...(p.additional_phones ?? [])].some(x => x.includes(digits)))) : filteredParties;
+    return list.slice(0, 20); // cap raw list; visible cap enforced via CSS max-height
+  }, [filteredParties, partyQuery]);
 
   // SALE numbers must be unique in the shop: check after typing stops (400 ms).
   useEffect(() => {
@@ -134,7 +164,7 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
 
   const reset = () => {
     setSaved(null); setPdfUrl(null); setItems([emptyItem()]); setInvoiceNo(''); setNotes(''); setRemindOn('');
-    setTaxOverride(''); setErrors({}); setFormError(null); setBillDate(todayIST());
+    setHsnCode(''); setHsnError(null); setTaxOverride(''); setErrors({}); setFormError(null); setBillDate(todayIST());
     if (kind === 'SALE') api.nextSaleInvoiceNo().then(n => setInvoiceNo(String(n))).catch(() => undefined);
   };
 
@@ -143,6 +173,8 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
     if (!partyId) errs.party_id = t('pick_party');
     if (!normalizeInvoice(invoiceNo)) errs.invoice_no = t('required');
     if (kind === 'SALE' && invoiceState === 'used') errs.invoice_no = t('bill_no_used');
+    const hsnErr = validateHsn(hsnCode);
+    if (hsnErr) errs.hsn_code = hsnErr;
     const clean = items.filter(i => i.name.trim() || i.rate.trim());
     if (!clean.length) errs.items = t('required');
     clean.forEach((it, i) => {
@@ -157,8 +189,11 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
     try {
       const res = await api.createBill({
         kind, party_id: partyId, invoice_no: invoiceNo, bill_date: billDate, gst_bp: gstBp,
+        // §1.2: attach prefix only for SALE bills so it's saved on the record.
+        ...(kind === 'SALE' && invoicePrefix ? { invoice_prefix: invoicePrefix } : {}),
         tax_mode_override: taxOverride || null,
         items: clean.map(i => ({ name: i.name.trim(), qty: parseInt(i.qty, 10), rate: toPaise(i.rate)! })),
+        hsn_code: hsnCode.trim() || null,
         remind_on: remindOn || null, remind_lead_days: remindOn ? leadDays : null,
         notes: notes.trim() || null, source: draft?.items?.length ? 'SCAN' : 'MANUAL'
       });
@@ -183,14 +218,19 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   const err = (k: string) => errors[k] && <p className="mt-1 text-sm text-rose-600">{errors[k]}</p>;
   const rs = (p: number) => formatPaiseToINR(p, true);
 
+  // The displayed bill number includes prefix only for SALE.
+  const displayBillNo = kind === 'SALE' && invoicePrefix ? `${invoicePrefix}${invoiceNo}` : invoiceNo;
+
   // ---------- after saving: open the bill PDF + share actions ----------
   if (saved) {
+    const savedBillNo = saved.invoice_prefix ? `${saved.invoice_prefix}${saved.invoice_number}` : saved.invoice_number;
     return (
       <div className="p-4 sm:p-6 space-y-4" data-no-swipe>
         <div className="text-center">
           <CheckCircle2 className="w-14 h-14 mx-auto text-emerald-600" />
           <p className="text-xl font-bold">{t('bill_saved')}</p>
-          <p className="text-base text-slate-700">{saved.party_name} · #{saved.invoice_number} · <b>{rs(saved.grand_total_paise)}</b></p>
+          <p className="text-base text-slate-700">{saved.party_name} · #{savedBillNo} · <b>{rs(saved.grand_total_paise)}</b></p>
+          {saved.hsn_code && <p className="text-sm text-slate-500 mt-1">HSN: {saved.hsn_code}</p>}
         </div>
         {pdfUrl && <object data={pdfUrl} type="application/pdf" className="w-full h-96 rounded-xl border border-slate-200" aria-label="Bill PDF" />}
         <div className="grid grid-cols-2 gap-2">
@@ -243,7 +283,7 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
         </div>
       )}
 
-      {/* Party: the only party search on this form */}
+      {/* §1.1 / §2.1 Party: filtered by kind (CUSTOMER for SALE, SUPPLIER for PURCHASE, ARTISAN for JOB_WORK) */}
       <div>
         <label className="block text-base font-semibold text-slate-800 mb-1">{t('pick_party')}</label>
         {party ? (
@@ -260,14 +300,15 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
               <Search className="w-5 h-5 absolute left-3 top-3.5 text-slate-400" />
               <input value={partyQuery} onChange={e => setPartyQuery(e.target.value)} placeholder={t('search_party')} className={`${field} pl-10`} />
             </div>
-            <div className="mt-2 rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            {/* max-3-row scrollable list (§1.1 §2.1): each row ≈ 56px; 3 rows = 168px */}
+            <div className="mt-2 rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden" style={{ maxHeight: '168px', overflowY: 'auto' }}>
               {matches.map(p => (
-                <button key={p.id} type="button" onClick={() => choose(p)} className="w-full min-h-12 px-3 py-2 text-left hover:bg-slate-50">
+                <button key={p.id} type="button" onClick={() => choose(p)} className="w-full min-h-14 px-3 py-2 text-left hover:bg-slate-50 flex flex-col justify-center">
                   <span className="block text-base font-semibold text-slate-900">{p.name}</span>
                   <span className="block text-sm text-slate-500">{p.phone}</span>
                 </button>
               ))}
-              {!matches.length && <p className="px-3 py-3 text-base text-slate-500">{t('no_party_found')}</p>}
+              {!matches.length && <p className="px-3 py-3 text-base text-slate-500">{noPartyLabel}</p>}
               {onNewParty && (
                 <button type="button" onClick={onNewParty} className="w-full min-h-12 px-3 text-left text-base font-bold text-indigo-700 flex items-center gap-2">
                   <UserPlus className="w-5 h-5" /> {t('add_new_party')}
@@ -279,14 +320,26 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
         {err('party_id')}
       </div>
 
+      {/* §1.2 Bill number: prefix auto-prepended for SALE only */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor={`${uid}-bill-no`} className="block text-base font-semibold text-slate-800 mb-1">{t('bill_no')}</label>
-          <input id={`${uid}-bill-no`} inputMode="numeric" value={invoiceNo}
-            onChange={e => setInvoiceNo(e.target.value.replace(/\D/g, ''))}
-            onPaste={e => { e.preventDefault(); setInvoiceNo((invoiceNo + e.clipboardData.getData('text')).replace(/\D/g, '')); }}
-            onBlur={() => { const n = normalizeInvoice(invoiceNo); setInvoiceNo(n ? String(n) : invoiceNo.replace(/^0+/, '')); }}
-            className={`${field} font-mono ${invoiceState === 'used' ? 'border-rose-500' : ''}`} />
+          {kind === 'SALE' && invoicePrefix ? (
+            <div className={`flex rounded-xl border-2 overflow-hidden ${invoiceState === 'used' ? 'border-rose-500' : 'border-slate-200'} focus-within:border-indigo-600`}>
+              <span className="flex items-center px-3 bg-slate-100 text-slate-600 text-base font-mono select-none shrink-0 border-r border-slate-200">{invoicePrefix}</span>
+              <input id={`${uid}-bill-no`} inputMode="numeric" value={invoiceNo}
+                onChange={e => setInvoiceNo(e.target.value.replace(/\D/g, ''))}
+                onPaste={e => { e.preventDefault(); setInvoiceNo((invoiceNo + e.clipboardData.getData('text')).replace(/\D/g, '')); }}
+                onBlur={() => { const n = normalizeInvoice(invoiceNo); setInvoiceNo(n ? String(n) : invoiceNo.replace(/^0+/, '')); }}
+                className="flex-1 h-12 px-3 bg-white text-base text-slate-900 font-mono focus:outline-none" />
+            </div>
+          ) : (
+            <input id={`${uid}-bill-no`} inputMode="numeric" value={invoiceNo}
+              onChange={e => setInvoiceNo(e.target.value.replace(/\D/g, ''))}
+              onPaste={e => { e.preventDefault(); setInvoiceNo((invoiceNo + e.clipboardData.getData('text')).replace(/\D/g, '')); }}
+              onBlur={() => { const n = normalizeInvoice(invoiceNo); setInvoiceNo(n ? String(n) : invoiceNo.replace(/^0+/, '')); }}
+              className={`${field} font-mono ${invoiceState === 'used' ? 'border-rose-500' : ''}`} />
+          )}
           {invoiceState === 'used' && (
             <p className="mt-1 text-sm text-rose-600">{t('bill_no_used')}{nextFree && <> · <button type="button" className="underline font-semibold" onClick={() => setInvoiceNo(String(nextFree))}>{t('use_next_no')}: {nextFree}</button></>}</p>
           )}
@@ -297,6 +350,27 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
           <label htmlFor={`${uid}-bill-date`} className="block text-base font-semibold text-slate-800 mb-1">{t('date')}</label>
           <input id={`${uid}-bill-date`} type="date" value={billDate} max={todayIST()} onChange={e => setBillDate(e.target.value)} className={field} />
         </div>
+      </div>
+
+      {/* §1.3 / §2.2 HSN Code — optional, digits only, 4–8 chars */}
+      <div>
+        <label htmlFor={`${uid}-hsn`} className="block text-base font-semibold text-slate-800 mb-1">
+          HSN / SAC Code <span className="text-slate-400 font-normal text-sm">(optional)</span>
+        </label>
+        <input
+          id={`${uid}-hsn`}
+          inputMode="numeric"
+          value={hsnCode}
+          maxLength={8}
+          placeholder="e.g. 5007"
+          onChange={e => {
+            const v = e.target.value.replace(/\D/g, '');
+            setHsnCode(v);
+            setHsnError(validateHsn(v));
+          }}
+          className={`${field} font-mono ${hsnError ? 'border-rose-500' : ''}`}
+        />
+        {hsnError && <p className="mt-1 text-sm text-rose-600">{hsnError}</p>}
       </div>
 
       <div>

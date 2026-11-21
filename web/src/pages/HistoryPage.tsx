@@ -34,6 +34,7 @@ export const HistoryPage: React.FC = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { shop } = useAuth();
   const openId = params.get('bill');
 
@@ -160,12 +161,30 @@ export const HistoryPage: React.FC = () => {
         {groups.map(g => (
           <section key={g.label}>
             <h2 className="text-base font-bold text-slate-500 mb-2">{g.label}</h2>
-            <div className="space-y-2">{g.rows.map(r => <BillRow key={`${r.item_kind}-${r.id}`} bill={r} onClick={() => open(r)} />)}</div>
+            <div className="space-y-2">
+              {g.rows.map(r => (
+                <BillRow
+                  key={`${r.item_kind}-${r.id}`}
+                  bill={r}
+                  onClick={() => open(r)}
+                  isExpanded={expandedId === r.id}
+                  onToggleExpand={() => setExpandedId(prev => (prev === r.id ? null : r.id))}
+                />
+              ))}
+            </div>
           </section>
         ))}
       </div>
       {/* Desktop: table with original amount, returns, paid, remaining, status */}
-      <div className="hidden md:block"><TransactionsTable rows={page} onOpen={open} detailed /></div>
+      <div className="hidden md:block">
+        <TransactionsTable
+          rows={page}
+          onOpen={open}
+          detailed
+          expandedId={expandedId}
+          onToggleExpand={id => setExpandedId(prev => (prev === id ? null : id))}
+        />
+      </div>
 
       {rows.length > shown && (
         <button onClick={() => setShown(shown + PAGE)} className="w-full h-12 rounded-xl bg-white border-2 border-slate-200 text-base font-semibold">

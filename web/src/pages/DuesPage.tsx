@@ -164,8 +164,26 @@ export const DuesPage: React.FC = () => {
                 <div className="mt-2 grid grid-cols-3 gap-2 text-sm text-slate-600 [&_b]:text-sm sm:[&_b]:text-base [&_b]:break-all [&>span]:min-w-0">
                   <span>{t('bill_total')}<b className="block text-base text-slate-900">{rs(b.grand_total_paise)}</b></span>
                   <span>{t('returned')}<b className="block text-base text-slate-900">{rs(b.return_paise ?? 0)}</b></span>
-                  <span>{t('paid')}<b className="block text-base text-slate-900">{rs(b.paid_paise)}</b></span>
+                  <span>
+                    {t('paid')}
+                    <b className="block text-base text-slate-900">{rs(b.paid_paise)}</b>
+                    {b.payments && b.payments.length > 0 && (
+                      <span className="block text-xs font-normal text-emerald-700">
+                        {fmtDate(b.payments[b.payments.length - 1].payment_date)}
+                      </span>
+                    )}
+                  </span>
                 </div>
+                {b.payments && b.payments.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-700">Payment date(s):</span>
+                    {b.payments.map((p, idx) => (
+                      <span key={p.id || idx} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                        {fmtDate(p.payment_date)}: <b className="text-emerald-700">{rs(p.amount_paise)}</b>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className={`mt-2 text-2xl font-extrabold ${collect ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {tab === 'pending' ? rs(b.pending_paise) : credit < 0 ? `${t('credit')} ${rs(-credit)}` : rs(0)}
                 </p>

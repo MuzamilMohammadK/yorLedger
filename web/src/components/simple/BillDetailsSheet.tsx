@@ -64,6 +64,7 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
               <p className="text-base text-slate-600">{t(`type_${party?.type ?? bill.party_type}` as any)} · {party?.phone ?? ''}</p>
               <p className="text-sm text-slate-500">{party?.gstin ?? '—'} · {getStateByCode(party?.state_code ?? '')?.name ?? '—'}</p>
               <p className="text-base text-slate-700 mt-1">{t('date')}: <b>{fmtDate(bill.invoice_date)}</b> · {raw?.tax_mode === 'INTER' ? t('other_state') : t('same_state')}</p>
+              {bill.hsn_code && <p className="text-sm font-mono text-slate-600 mt-0.5">HSN/SAC: <b>{bill.hsn_code}</b></p>}
             </div>
             <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold ${BADGE[st]}`}>{t(`status_${st}` as any)}</span>
           </div>

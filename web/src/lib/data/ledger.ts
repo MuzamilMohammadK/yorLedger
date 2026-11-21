@@ -156,10 +156,12 @@ export async function createBill(shop: Shop, payload: CreateBillPayload) {
     party_name: party!.name,
     party_type: party!.type,
     invoice_no: invoiceNo!,
+    invoice_prefix: payload.invoice_prefix ?? null,
     bill_date: payload.bill_date,
     gst_bp: payload.gst_bp,
     tax_mode: tax.taxMode,
     items: items.map(i => ({ name: i.name.trim(), qty: i.qty, rate: i.rate, line_total: i.qty * i.rate })),
+    hsn_code: payload.hsn_code ?? null,
     subtotal: tax.subtotal,
     cgst: tax.cgst,
     sgst: tax.sgst,
@@ -236,10 +238,11 @@ export async function recordPayment(shopId: string, p: PaymentPayload) {
     const base = { bill_id: p.bill_id, party_id: bill.party_id, amount: p.amount, mode: p.mode,
                    notes: p.notes?.trim() || null, created_at: serverTimestamp() };
     let record: Record<string, unknown>;
+    const payDate = p.mode === 'CASH' ? p.paid_on : p.mode === 'CHEQUE' ? p.cheque_date : p.txn_date;
     if (p.mode === 'CASH') {
-      record = { ...base, paid_on: p.paid_on, collected_by: p.collected_by.trim() };
+      record = { ...base, payment_date: payDate, paid_on: p.paid_on, collected_by: p.collected_by.trim() };
     } else if (p.mode === 'CHEQUE') {
-      record = { ...base, paid_on: p.cheque_date, cheque_no: p.cheque_no?.trim() || null, cheque_date: p.cheque_date,
+      record = { ...base, payment_date: payDate, paid_on: p.cheque_date, cheque_no: p.cheque_no?.trim() || null, cheque_date: p.cheque_date,
                  deposit_date: p.deposit_date || null, clearing_date: p.clearing_date || null,
                  clearing_status: p.clearing_date ? 'CLEARED' : 'PENDING' };
     } else {
@@ -249,7 +252,7 @@ export async function recordPayment(shopId: string, p: PaymentPayload) {
         throw new AppError('This UTR number is already recorded', 'DUPLICATE_UTR', { utr_no: 'Already used' }, 409);
       }
       tx.set(utrRef, { payment_id: payRef.id });
-      record = { ...base, paid_on: p.txn_date, utr_no: utr, txn_date: p.txn_date };
+      record = { ...base, payment_date: payDate, paid_on: p.txn_date, utr_no: utr, txn_date: p.txn_date };
     }
     const paid_total = bill.paid_total + p.amount;
     const amount_due = bill.grand_total - paid_total - bill.returned_total;

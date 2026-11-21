@@ -44,7 +44,10 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
   const fmt = INVOICE_DATE_FORMATS.includes(inv?.date_format as any) ? (inv!.date_format as typeof INVOICE_DATE_FORMATS[number]) : 'DD/MM/YYYY';
   const dmy = (iso: string) => formatDate(iso, fmt);
   const showGstin = inv?.show_gstin ?? true;
-  const billNo = `${inv?.invoice_prefix ?? ''}${bill.invoice_number}`;
+  // If bill.invoice_number already has prefix (or use bill.invoice_prefix / settings prefix for SALE only)
+  const billNo = bill.invoice_number.includes(bill.invoice_prefix ?? '') && bill.invoice_prefix
+    ? bill.invoice_number
+    : `${bill.type === 'SALE' ? (bill.invoice_prefix ?? inv?.invoice_prefix ?? '') : (bill.invoice_prefix ?? '')}${bill.invoice_number}`;
   const W = 210, L = 14, R = W - 14;
   const party = cache.rawParty(bill.party_id);
   let y = 16;
@@ -65,6 +68,9 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
   doc.text(showGstin ? `GSTIN: ${shop.gstin}   Ph: ${shop.phone}` : `Ph: ${shop.phone}`, nameX, y);
   doc.text(`Bill No: ${billNo}`, R, 22, { align: 'right' });
   doc.text(`Date: ${dmy(bill.invoice_date)}`, R, 27, { align: 'right' });
+  if (bill.hsn_code) {
+    doc.text(`HSN/SAC: ${bill.hsn_code}`, R, 31.5, { align: 'right' });
+  }
   y += 7;
   doc.setDrawColor(180).line(L, y, R, y);
   y += 6;
@@ -122,6 +128,51 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
     doc.text(label, 140, y, { align: 'right' });
     doc.text(value, R - 1, y, { align: 'right' });
     y += bold ? 7 : 5.5;
+  }
+
+  // Payment Details table (§3)
+  const payments = bill.payments ?? [];
+  if (payments.length > 0) {
+    y += 4;
+    if (y > 240) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(0);
+    doc.text('Payment Details', L, y);
+    y += 4.5;
+
+    const payCols = [L, L + 28, L + 75, L + 115, R];
+    const payHead = () => {
+      doc.setFillColor(242, 244, 248).rect(L, y - 4, R - L, 6, 'F');
+      doc.setFont('helvetica', 'bold').setFontSize(8).setTextColor(50);
+      doc.text('Date', payCols[0] + 1, y);
+      doc.text('Amount paid', payCols[1] + 16, y, { align: 'right' });
+      doc.text('Payment mode', payCols[2], y);
+      doc.text('Receipt no.', payCols[3], y);
+      doc.setFont('helvetica', 'normal').setTextColor(0);
+      y += 5.5;
+    };
+    payHead();
+
+    const sortedPays = [...payments].sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || ''));
+    sortedPays.forEach(p => {
+      if (y > 265) { doc.addPage(); y = 20; payHead(); }
+      const pDate = p.payment_date ? formatDate(p.payment_date, 'DD/MM/YYYY') : dmy(bill.invoice_date);
+      const receiptNo = p.reference_number || (p.cheque_number ? `CHQ-${p.cheque_number}` : (p.id ? `RCP-${p.id.slice(-6).toUpperCase()}` : '—'));
+      doc.setFontSize(8);
+      doc.text(pDate, payCols[0] + 1, y);
+      doc.text(money(p.amount_paise), payCols[1] + 16, y, { align: 'right' });
+      doc.text(p.payment_mode || '—', payCols[2], y);
+      doc.text(receiptNo, payCols[3], y);
+      y += 4.5;
+    });
+
+    doc.line(L, y - 1, R, y - 1);
+    y += 3.5;
+    if (y > 270) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold').setFontSize(8.5);
+    const paidTotal = payments.reduce((sum, p) => sum + (p.amount_paise || 0), 0);
+    const remainingTotal = Math.max(0, bill.grand_total_paise - (bill.return_paise || 0) - paidTotal);
+    doc.text(`Total paid: ${money(paidTotal)}      Remaining: ${money(remainingTotal)}`, R, y, { align: 'right' });
+    y += 5;
   }
 
   // Footer text and terms (§12.5).

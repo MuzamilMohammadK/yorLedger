@@ -202,6 +202,7 @@ export interface Transaction {
   party_type: PartyType;
   type: TransactionType;
   invoice_number: string;
+  invoice_prefix?: string | null; // prefix from InvoiceSettings at time of bill (§1.2)
   invoice_date: string;
   due_date?: string | null;
   subtotal_paise: number;
@@ -214,6 +215,7 @@ export interface Transaction {
   return_paise?: number;
   pending_paise: number;
   status: PaymentStatus;
+  hsn_code?: string | null;  // 4–8 digit HSN/SAC code (§1.3)
   items?: TransactionItem[];
   payments?: PaymentRecord[];
   returns?: ReturnRecord[];
@@ -226,6 +228,7 @@ export interface CreateTransactionPayload {
   party_id: string;
   type: TransactionType;
   invoice_number?: string;
+  invoice_prefix?: string;
   invoice_date?: string;
   due_date?: string | null;
   amount_rupees: number;
@@ -234,6 +237,7 @@ export interface CreateTransactionPayload {
   is_inter_state?: boolean;
   notes?: string | null;
   item_name?: string;
+  hsn_code?: string | null;
 }
 
 export interface RecordPaymentPayload {
@@ -589,10 +593,12 @@ export interface CreateBillPayload {
   kind: BillKind;
   party_id: string;
   invoice_no: string;        // digits; normalized (leading zeros stripped)
+  invoice_prefix?: string;   // prefix prepended for display (§1.2)
   bill_date: string;         // YYYY-MM-DD (IST)
   gst_bp: number;            // copied onto the bill as a snapshot
   tax_mode_override?: 'INTRA' | 'INTER' | null; // manual override per bill (spec §8.6)
   items: BillItemPayload[];
+  hsn_code?: string | null;  // 4–8 digit HSN/SAC code (optional, §1.3)
   remind_on?: string | null;
   remind_lead_days?: 0 | 1 | 3 | 7 | null;
   notes?: string | null;

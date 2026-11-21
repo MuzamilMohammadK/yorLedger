@@ -12,20 +12,26 @@ export function validatePayment(p: PaymentPayload, amountDue: number): Record<st
   const e: Record<string, string> = {};
   if (!Number.isInteger(p.amount) || p.amount <= 0) e.amount = 'Enter the amount';
   else if (p.amount > amountDue) e.amount = 'Amount is more than the amount due';
+
+  const today = new Date().toISOString().slice(0, 10);
+
   switch (p.mode) {
     case 'CASH':
       if (!DATE.test(p.paid_on ?? '')) e.paid_on = 'Payment date is required';
+      else if (p.paid_on > today) e.paid_on = 'Payment date cannot be in the future';
       if (!p.collected_by?.trim()) e.collected_by = 'Who collected / paid the cash?';
       break;
     case 'CHEQUE':
-      if (!DATE.test(p.cheque_date ?? '')) e.cheque_date = 'Cheque date is required';
+      if (!DATE.test(p.cheque_date ?? '')) e.cheque_date = 'Payment date is required';
+      else if (p.cheque_date > today) e.cheque_date = 'Payment date cannot be in the future';
       if (p.deposit_date && !DATE.test(p.deposit_date)) e.deposit_date = 'Invalid date';
       if (p.clearing_date && !DATE.test(p.clearing_date)) e.clearing_date = 'Invalid date';
       if (p.deposit_date && p.clearing_date && p.clearing_date < p.deposit_date) e.clearing_date = 'Clearing date is before deposit date';
       break;
     case 'NEFT':
       if (!/^[A-Za-z0-9]{6,22}$/.test(p.utr_no?.trim() ?? '')) e.utr_no = 'Enter the UTR number (letters and digits)';
-      if (!DATE.test(p.txn_date ?? '')) e.txn_date = 'Transaction date is required';
+      if (!DATE.test(p.txn_date ?? '')) e.txn_date = 'Payment date is required';
+      else if (p.txn_date > today) e.txn_date = 'Payment date cannot be in the future';
       break;
     default:
       e.mode = 'Choose cash, cheque or NEFT';

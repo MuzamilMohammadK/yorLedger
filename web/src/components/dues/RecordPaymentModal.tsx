@@ -111,6 +111,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const save = async () => {
     if (!bill) return;
     if (!paise) { setErrors({ amount: t('required') }); return; }
+    if (!date) { setErrors({ date: 'Payment date is required' }); return; }
+    if (date > todayIST()) { setErrors({ date: 'Payment date cannot be in the future' }); return; }
     let payload: PaymentPayload;
     if (mode === 'CASH') payload = { mode, bill_id: bill.id, amount: paise, paid_on: date, collected_by: collectedBy, notes };
     else if (mode === 'CHEQUE') payload = { mode, bill_id: bill.id, amount: paise, cheque_no: chequeNo, cheque_date: date,
@@ -191,8 +193,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {mode === 'CASH' && (
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-base font-semibold text-slate-800">{t('date')}
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                <label className="text-base font-semibold text-slate-800">{t('date')} <span className="text-rose-500">*</span>
+                  <input type="date" value={date} max={todayIST()} onChange={e => setDate(e.target.value)} className={field} />
+                  {err('paid_on') || err('date')}
                 </label>
                 <label className="text-base font-semibold text-slate-800">{incoming ? t('collected_by') : t('paid_by')}
                   <input value={collectedBy} onChange={e => setCollectedBy(e.target.value)} className={field} />
@@ -207,8 +210,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   <label className="text-base font-semibold text-slate-800">{t('cheque_no')}
                     <input inputMode="numeric" value={chequeNo} onChange={e => setChequeNo(e.target.value.replace(/\D/g, ''))} className={field} />
                   </label>
-                  <label className="text-base font-semibold text-slate-800">{t('cheque_date')}
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                  <label className="text-base font-semibold text-slate-800">{t('cheque_date')} <span className="text-rose-500">*</span>
+                    <input type="date" value={date} max={todayIST()} onChange={e => setDate(e.target.value)} className={field} />
+                    {err('cheque_date') || err('date')}
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -228,8 +232,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   <input value={utr} onChange={e => setUtr(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())} className={`${field} font-mono`} />
                   {err('utr_no')}
                 </label>
-                <label className="text-base font-semibold text-slate-800">{t('txn_date')}
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className={field} />
+                <label className="text-base font-semibold text-slate-800">{t('txn_date')} <span className="text-rose-500">*</span>
+                  <input type="date" value={date} max={todayIST()} onChange={e => setDate(e.target.value)} className={field} />
+                  {err('txn_date') || err('date')}
                 </label>
               </div>
             )}

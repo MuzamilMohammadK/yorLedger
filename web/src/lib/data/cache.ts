@@ -7,7 +7,7 @@
 import { collection, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { Party, PaymentRecord, ReturnRecord, Transaction, TransactionItem, PaymentStatus } from '@yorbalance/shared';
 import { db } from '../firebase';
-import { toIso } from './util';
+import { toIso, todayIST } from './util';
 
 export interface BillItemDoc { name: string; qty: number; rate: number; line_total: number }
 
@@ -162,6 +162,10 @@ class ShopCache {
 
   private toPayment(p: Raw): PaymentRecord {
     const party = this.raw.parties.get(p.party_id);
+    const rawDate = p.payment_date || (p.mode === 'NEFT' ? p.txn_date : p.mode === 'CHEQUE' ? p.cheque_date : p.paid_on);
+    const createdDate = toIso(p.created_at)?.slice(0, 10);
+    const payment_date = rawDate || createdDate || (typeof p.created_at === 'string' ? p.created_at.slice(0, 10) : '') || todayIST();
+
     return {
       id: p.id,
       shop_id: this.shopId!,
@@ -172,7 +176,7 @@ class ShopCache {
       amount_paise: p.amount,
       amount_rupees: p.amount / 100,
       payment_mode: p.mode,
-      payment_date: p.mode === 'NEFT' ? p.txn_date : p.mode === 'CHEQUE' ? p.cheque_date : p.paid_on,
+      payment_date,
       reference_number: p.utr_no ?? null,
       cheque_number: p.cheque_no ?? null,
       cheque_date: p.cheque_date ?? null,
@@ -180,7 +184,7 @@ class ShopCache {
       clearing_status: p.mode === 'CHEQUE' ? (p.clearing_status ?? 'PENDING') : null,
       collected_by: p.collected_by ?? null,
       notes: p.notes ?? null,
-      created_at: toIso(p.created_at) ?? p.paid_on
+      created_at: toIso(p.created_at) ?? payment_date
     };
   }
 
@@ -206,7 +210,8 @@ class ShopCache {
       party_name: party?.name ?? b.party_name ?? 'Party',
       party_type: party?.type ?? b.party_type,
       type: b.kind,
-      invoice_number: String(b.invoice_no),
+      invoice_number: b.invoice_prefix ? `${b.invoice_prefix}${b.invoice_no}` : String(b.invoice_no),
+      invoice_prefix: b.invoice_prefix ?? null,
       invoice_date: b.bill_date,
       due_date: b.remind_on ?? null,
       subtotal_paise: b.subtotal,
@@ -219,6 +224,7 @@ class ShopCache {
       return_paise: b.returned_total,
       pending_paise: Math.max(0, due),
       status,
+      hsn_code: b.hsn_code ?? null,
       items,
       payments: pays.filter(p => p.transaction_id === b.id),
       returns: rets.filter(r => r.transaction_id === b.id),
