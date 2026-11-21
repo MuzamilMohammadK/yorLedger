@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Users, Plus, Wallet, Menu, ScrollText, BarChart3, Settings, LogOut, Bell, Languages, BookOpen } from 'lucide-react';
+import { Home, Users, Plus, Wallet, Menu, ScrollText, BarChart3, Settings, LogOut, Bell, Languages, BookOpen, Boxes } from 'lucide-react';
 import { BillKind, Party, formatPaiseToINR } from '@yorbalance/shared';
 import { useAuth } from '../../context/AuthContext';
 import { useI18n, LANGUAGES } from '../../i18n';
@@ -31,13 +31,14 @@ const NAV = [
   { to: '/ledger', key: 'nav_ledger', icon: BookOpen },
   { to: '/history', key: 'nav_history', icon: ScrollText },
   { to: '/dues', key: 'nav_dues', icon: Wallet },
+  { to: '/stock', key: 'nav_stock', icon: Boxes },
   { to: '/reports', key: 'nav_reports', icon: BarChart3 },
   { to: '/settings', key: 'nav_settings', icon: Settings }
 ] as const;
-// Phone bottom bar: Dashboard, Parties, Ledger (centre), Dues, More (History, Reports, Settings).
+// Phone bottom bar: Dashboard, Parties, Ledger (centre), Dues, More (History, Stock, Reports, Settings).
 const BOTTOM_LEFT = [NAV[0], NAV[1]];
 const BOTTOM_RIGHT = NAV[4];
-const EXTRA = [NAV[3], NAV[5], NAV[6]];
+const EXTRA = [NAV[3], NAV[5], NAV[6], NAV[7]];
 
 /** Frame for every signed-in, approved shop screen. */
 export const AppShell: React.FC = () => {

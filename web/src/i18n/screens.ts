@@ -8,6 +8,7 @@ export const screensEn = {
   nav_dues: "Dues",
   nav_more: 'More',
   nav_history: "History",
+  nav_stock: "Stock & Production",
   nav_reports: "Reports & GST",
   nav_settings: 'Settings',
   logout: 'Log out',

@@ -19,6 +19,7 @@ import { LedgerPage } from './pages/LedgerPage';
 import { DuesPage } from './pages/DuesPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { StockPage } from './pages/StockPage';
 
 /** §12.8 default landing page preference. */
 const LandingRedirect: React.FC = () => <Navigate to={useI18n().landing} replace />;
@@ -50,6 +51,7 @@ export const App: React.FC = () => {
                 <Route path="/ledger" element={<LedgerPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/dues" element={<DuesPage />} />
+                <Route path="/stock" element={<StockPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/reports" element={<AnalyticsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

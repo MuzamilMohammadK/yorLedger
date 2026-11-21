@@ -95,6 +95,7 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   const [saved, setSaved] = useState<Transaction | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [invoicePrefix, setInvoicePrefix] = useState('');
+  const [stockWarnings, setStockWarnings] = useState<Record<number, string>>({});
   const checkTimer = useRef<number | undefined>(undefined);
   const uid = useId();
 
@@ -154,6 +155,29 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
   }, [items, gstBp, partyState, shop, taxOverride]);
 
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+
+  // Check stock for Sale items: warn if qty exceeds in-hand balance
+  useEffect(() => {
+    if (kind !== 'SALE') {
+      setStockWarnings({});
+      return;
+    }
+    api.getStockTally().then(tally => {
+      const warnings: Record<number, string> = {};
+      items.forEach((it, idx) => {
+        const name = (it.name || '').trim().toLowerCase();
+        if (!name) return;
+        const match = tally.find(t => t.item_name.toLowerCase() === name);
+        const qty = parseInt(it.qty, 10) || 0;
+        if (match) {
+          if (qty > match.in_hand_balance) {
+            warnings[idx] = `Stock warning: Only ${match.in_hand_balance} in hand (selling ${qty} will leave ${match.in_hand_balance - qty})`;
+          }
+        }
+      });
+      setStockWarnings(warnings);
+    }).catch(() => undefined);
+  }, [items, kind]);
 
   const setItem = (i: number, patch: Partial<DraftItem>) => setItems(prev => prev.map((it, k) => (k === i ? { ...it, ...patch } : it)));
   const choose = (p: Party) => {
@@ -401,6 +425,12 @@ export const BillForm: React.FC<Props> = ({ parties, kinds = ['SALE', 'PURCHASE'
                   </div>
                 </div>
                 {(errors[`items.${i}.qty`] || errors[`items.${i}.rate`]) && <p className="text-sm text-rose-600">{t('required')}</p>}
+                {stockWarnings[i] && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-xs sm:text-sm font-semibold text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{stockWarnings[i]}</span>
+                  </div>
+                )}
               </div>
             );
           })}

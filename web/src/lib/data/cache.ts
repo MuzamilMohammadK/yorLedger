@@ -5,7 +5,11 @@
 // persistent cache serves restarts. That keeps a small shop well inside the
 // Spark free tier (50k reads/day) while every screen reads from memory.
 import { collection, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import { Party, PaymentRecord, ReturnRecord, Transaction, TransactionItem, PaymentStatus } from '@yorbalance/shared';
+import {
+  Party, PaymentRecord, ReturnRecord, Transaction, TransactionItem, PaymentStatus,
+  StockMovement, RawMaterial, RawMaterialTx, Weaver, OwnLoomRegister,
+  WeaverTransaction, Staff, StaffRecord, PolishingBatch
+} from '@yorbalance/shared';
 import { db } from '../firebase';
 import { toIso, todayIST } from './util';
 
@@ -13,20 +17,41 @@ export interface BillItemDoc { name: string; qty: number; rate: number; line_tot
 
 type Raw = Record<string, any> & { id: string };
 
-const COLLECTIONS = ['parties', 'bills', 'payments', 'returns'] as const;
+const COLLECTIONS = [
+  'parties', 'bills', 'payments', 'returns',
+  'stockMovements', 'rawMaterials', 'rawMaterialTx',
+  'weavers', 'ownLooms', 'weaverTx', 'staff', 'staffRecords', 'polishing'
+] as const;
 type Col = typeof COLLECTIONS[number];
 
 class ShopCache {
   private shopId: string | null = null;
   private raw: Record<Col, Map<string, Raw>> = {
-    parties: new Map(), bills: new Map(), payments: new Map(), returns: new Map()
+    parties: new Map(), bills: new Map(), payments: new Map(), returns: new Map(),
+    stockMovements: new Map(), rawMaterials: new Map(), rawMaterialTx: new Map(),
+    weavers: new Map(), ownLooms: new Map(), weaverTx: new Map(),
+    staff: new Map(), staffRecords: new Map(), polishing: new Map()
   };
   private loaded = new Set<Col>();
   private unsubs: Unsubscribe[] = [];
   private readyResolvers: Array<() => void> = [];
   private readyRejecters: Array<(e: unknown) => void> = [];
   private listeners = new Set<() => void>();
-  private memo: { tx?: Transaction[]; parties?: Party[]; payments?: PaymentRecord[]; returns?: ReturnRecord[] } = {};
+  private memo: {
+    tx?: Transaction[];
+    parties?: Party[];
+    payments?: PaymentRecord[];
+    returns?: ReturnRecord[];
+    stockMovements?: StockMovement[];
+    rawMaterials?: RawMaterial[];
+    rawMaterialTx?: RawMaterialTx[];
+    weavers?: Weaver[];
+    ownLooms?: OwnLoomRegister | null;
+    weaverTx?: WeaverTransaction[];
+    staff?: Staff[];
+    staffRecords?: StaffRecord[];
+    polishing?: PolishingBatch[];
+  } = {};
 
   get currentShopId() { return this.shopId; }
 
@@ -137,6 +162,187 @@ class ShopCache {
     const rets = this.returns();
     const out = this.rawBills().map(b => this.toTransaction(b, pays, rets));
     return (this.memo.tx = out);
+  }
+
+  stockMovements(): StockMovement[] {
+    if (this.memo.stockMovements) return this.memo.stockMovements;
+    const out = [...this.raw.stockMovements.values()].map(r => ({
+      id: r.id,
+      shop_id: this.shopId!,
+      item_name: r.item_name,
+      movement_type: r.movement_type,
+      qty: Number(r.qty) || 0,
+      rate_paise: r.rate_paise != null ? Number(r.rate_paise) : undefined,
+      ref_id: r.ref_id ?? null,
+      ref_no: r.ref_no ?? null,
+      date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+      notes: r.notes ?? null,
+      created_at: toIso(r.created_at) ?? r.date
+    }));
+    return (this.memo.stockMovements = out);
+  }
+
+  rawMaterials(): RawMaterial[] {
+    if (this.memo.rawMaterials) return this.memo.rawMaterials;
+    const out = [...this.raw.rawMaterials.values()].map(r => ({
+      id: r.id,
+      shop_id: this.shopId!,
+      name: r.name,
+      unit: r.unit || 'kg',
+      unit_price_paise: Number(r.unit_price_paise) || 0,
+      low_stock_threshold_kg: r.low_stock_threshold_kg != null ? Number(r.low_stock_threshold_kg) : 5,
+      created_at: toIso(r.created_at) ?? new Date().toISOString(),
+      updated_at: toIso(r.updated_at) ?? undefined
+    }));
+    return (this.memo.rawMaterials = out);
+  }
+
+  rawMaterialTx(): RawMaterialTx[] {
+    if (this.memo.rawMaterialTx) return this.memo.rawMaterialTx;
+    const out = [...this.raw.rawMaterialTx.values()].map(r => {
+      const mat = this.raw.rawMaterials.get(r.material_id);
+      const w = r.weaver_id ? this.raw.weavers.get(r.weaver_id) : null;
+      return {
+        id: r.id,
+        shop_id: this.shopId!,
+        material_id: r.material_id,
+        material_name: r.material_name || (mat?.name ?? 'Material'),
+        tx_type: r.tx_type,
+        qty_kg: Number(r.qty_kg) || 0,
+        rate_per_kg_paise: Number(r.rate_per_kg_paise) || 0,
+        total_amount_paise: Number(r.total_amount_paise) || 0,
+        weaver_id: r.weaver_id ?? null,
+        weaver_name: r.weaver_name ?? (w?.name ?? null),
+        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+        ref_no: r.ref_no ?? null,
+        notes: r.notes ?? null,
+        created_at: toIso(r.created_at) ?? r.date
+      };
+    });
+    return (this.memo.rawMaterialTx = out);
+  }
+
+  weavers(): Weaver[] {
+    if (this.memo.weavers) return this.memo.weavers;
+    const out = [...this.raw.weavers.values()].map(r => ({
+      id: r.id,
+      shop_id: this.shopId!,
+      name: r.name,
+      phone: r.phone || '',
+      address: r.address || '',
+      type: r.type || 'HANDLOOM',
+      looms_count: Number(r.looms_count) || 1,
+      notes: r.notes ?? null,
+      created_at: toIso(r.created_at) ?? new Date().toISOString(),
+      updated_at: toIso(r.updated_at) ?? undefined
+    }));
+    return (this.memo.weavers = out);
+  }
+
+  ownLooms(): OwnLoomRegister | null {
+    if (this.memo.ownLooms !== undefined) return this.memo.ownLooms;
+    const raw = [...this.raw.ownLooms.values()][0];
+    if (!raw) return (this.memo.ownLooms = null);
+    const out: OwnLoomRegister = {
+      id: raw.id,
+      shop_id: this.shopId!,
+      handloom_running: Number(raw.handloom_running) || 0,
+      handloom_idle: Number(raw.handloom_idle) || 0,
+      handloom_repair: Number(raw.handloom_repair) || 0,
+      powerloom_running: Number(raw.powerloom_running) || 0,
+      powerloom_idle: Number(raw.powerloom_idle) || 0,
+      powerloom_repair: Number(raw.powerloom_repair) || 0,
+      updated_at: toIso(raw.updated_at) ?? new Date().toISOString()
+    };
+    return (this.memo.ownLooms = out);
+  }
+
+  weaverTx(): WeaverTransaction[] {
+    if (this.memo.weaverTx) return this.memo.weaverTx;
+    const out = [...this.raw.weaverTx.values()].map(r => {
+      const w = this.raw.weavers.get(r.weaver_id);
+      return {
+        id: r.id,
+        shop_id: this.shopId!,
+        weaver_id: r.weaver_id,
+        weaver_name: r.weaver_name ?? (w?.name ?? 'Weaver'),
+        action_type: r.action_type,
+        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+        material_id: r.material_id ?? null,
+        material_name: r.material_name ?? null,
+        qty_kg: r.qty_kg != null ? Number(r.qty_kg) : undefined,
+        unit_price_paise: r.unit_price_paise != null ? Number(r.unit_price_paise) : undefined,
+        total_material_paise: r.total_material_paise != null ? Number(r.total_material_paise) : undefined,
+        finished_item_name: r.finished_item_name,
+        sarees_count: r.sarees_count != null ? Number(r.sarees_count) : undefined,
+        wastage_kg: r.wastage_kg != null ? Number(r.wastage_kg) : undefined,
+        wage_amount_paise: r.wage_amount_paise != null ? Number(r.wage_amount_paise) : undefined,
+        payment_amount_paise: r.payment_amount_paise != null ? Number(r.payment_amount_paise) : undefined,
+        payment_mode: r.payment_mode,
+        notes: r.notes ?? null,
+        created_at: toIso(r.created_at) ?? r.date
+      };
+    });
+    return (this.memo.weaverTx = out);
+  }
+
+  staff(): Staff[] {
+    if (this.memo.staff) return this.memo.staff;
+    const out = [...this.raw.staff.values()].map(r => ({
+      id: r.id,
+      shop_id: this.shopId!,
+      name: r.name,
+      role: r.role || 'Staff',
+      phone: r.phone || '',
+      wage_type: r.wage_type || 'MONTHLY',
+      wage_amount_paise: Number(r.wage_amount_paise) || 0,
+      joining_date: r.joining_date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+      status: r.status || 'ACTIVE',
+      created_at: toIso(r.created_at) ?? new Date().toISOString(),
+      updated_at: toIso(r.updated_at) ?? undefined
+    }));
+    return (this.memo.staff = out);
+  }
+
+  staffRecords(): StaffRecord[] {
+    if (this.memo.staffRecords) return this.memo.staffRecords;
+    const out = [...this.raw.staffRecords.values()].map(r => {
+      const s = this.raw.staff.get(r.staff_id);
+      return {
+        id: r.id,
+        shop_id: this.shopId!,
+        staff_id: r.staff_id,
+        staff_name: r.staff_name ?? (s?.name ?? 'Staff'),
+        record_type: r.record_type,
+        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+        attendance_status: r.attendance_status,
+        amount_paise: r.amount_paise != null ? Number(r.amount_paise) : undefined,
+        notes: r.notes ?? null,
+        created_at: toIso(r.created_at) ?? r.date
+      };
+    });
+    return (this.memo.staffRecords = out);
+  }
+
+  polishing(): PolishingBatch[] {
+    if (this.memo.polishing) return this.memo.polishing;
+    const out = [...this.raw.polishing.values()].map(r => ({
+      id: r.id,
+      shop_id: this.shopId!,
+      person_name: r.person_name,
+      item_name: r.item_name || 'Silk Saree',
+      sarees_sent: Number(r.sarees_sent) || 0,
+      sarees_received: Number(r.sarees_received) || 0,
+      unit_price_paise: Number(r.unit_price_paise) || 0,
+      total_amount_paise: Number(r.total_amount_paise) || ((Number(r.sarees_sent) || 0) * (Number(r.unit_price_paise) || 0)),
+      sent_date: r.sent_date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
+      received_date: r.received_date ?? null,
+      status: r.status || 'PENDING',
+      notes: r.notes ?? null,
+      created_at: toIso(r.created_at) ?? r.sent_date,
+      updated_at: toIso(r.updated_at) ?? undefined
+    }));
+    return (this.memo.polishing = out);
   }
 
   private toParty(p: Raw): Party {

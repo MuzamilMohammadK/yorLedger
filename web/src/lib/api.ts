@@ -324,6 +324,92 @@ export const api = {
     return dueReminders(compute.getRecentTransactions(s.id, 100000), id => cache.rawBill(id)?.remind_lead_days ?? 0);
   },
 
+  // ---------- Stock & Production ----------
+  getStockTally: async (search?: string) => {
+    const s = await shopReady();
+    return compute.getStockTally(s.id, search);
+  },
+  getItemLedger: async (itemName: string) => {
+    const s = await shopReady();
+    return compute.getItemLedger(s.id, itemName);
+  },
+  recordStockMovement: async (payload: { item_name: string; movement_type: any; qty: number; rate_paise?: number; date?: string; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.recordStockMovement(s.id, payload);
+  },
+  getRawMaterials: async () => {
+    const s = await shopReady();
+    return compute.getRawMaterialsSummary(s.id);
+  },
+  createRawMaterial: async (payload: { name: string; unit?: string; unit_price_paise: number; low_stock_threshold_kg?: number }) => {
+    const s = await shopReady();
+    return ledger.createRawMaterial(s.id, payload);
+  },
+  updateRawMaterial: async (id: string, payload: { name?: string; unit_price_paise?: number; low_stock_threshold_kg?: number }) => {
+    const s = await shopReady();
+    return ledger.updateRawMaterial(s.id, id, payload);
+  },
+  recordRawMaterialTx: async (payload: { material_id: string; tx_type: any; qty_kg: number; rate_per_kg_paise: number; weaver_id?: string | null; date?: string; ref_no?: string | null; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.recordRawMaterialTx(s.id, payload);
+  },
+  getWeavers: async () => {
+    const s = await shopReady();
+    return compute.getWeaversSummary(s.id);
+  },
+  getOwnLooms: async () => {
+    await shopReady();
+    return cache.ownLooms();
+  },
+  updateOwnLooms: async (payload: { handloom_running: number; handloom_idle: number; handloom_repair: number; powerloom_running: number; powerloom_idle: number; powerloom_repair: number }) => {
+    const s = await shopReady();
+    return ledger.updateOwnLooms(s.id, payload);
+  },
+  createWeaver: async (payload: { name: string; phone: string; address?: string; type: any; looms_count: number; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.createWeaver(s.id, payload);
+  },
+  updateWeaver: async (id: string, payload: Partial<{ name: string; phone: string; address: string; type: any; looms_count: number; notes: string | null }>) => {
+    const s = await shopReady();
+    return ledger.updateWeaver(s.id, id, payload);
+  },
+  recordWeaverTx: async (payload: any) => {
+    const s = await shopReady();
+    return ledger.recordWeaverTx(s.id, payload);
+  },
+  getStaff: async () => {
+    const s = await shopReady();
+    return compute.getStaffSummary(s.id);
+  },
+  createStaff: async (payload: { name: string; role: string; phone: string; wage_type: any; wage_amount_paise: number; joining_date?: string }) => {
+    const s = await shopReady();
+    return ledger.createStaff(s.id, payload);
+  },
+  updateStaff: async (id: string, payload: any) => {
+    const s = await shopReady();
+    return ledger.updateStaff(s.id, id, payload);
+  },
+  recordStaffRecord: async (payload: any) => {
+    const s = await shopReady();
+    return ledger.recordStaffRecord(s.id, payload);
+  },
+  getPolishing: async (filter?: { from?: string; to?: string }) => {
+    const s = await shopReady();
+    return compute.getPolishingSummary(s.id, filter);
+  },
+  createPolishingBatch: async (payload: { person_name: string; item_name: string; sarees_sent: number; unit_price_paise: number; sent_date?: string; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.createPolishingBatch(s.id, payload);
+  },
+  updatePolishingBatch: async (id: string, payload: { sarees_received: number; received_date?: string; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.updatePolishingBatch(s.id, id, payload);
+  },
+  getStockProductionAnalysis: async (dateRange?: { from?: string; to?: string }) => {
+    const s = await shopReady();
+    return compute.getStockProductionAnalysis(s.id, dateRange);
+  },
+
   /** Re-render hook: fires on any live data change for the active shop. */
   onDataChange: (fn: () => void) => cache.subscribe(fn)
 };

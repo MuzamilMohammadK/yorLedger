@@ -17,6 +17,7 @@ export const Navbar: React.FC = () => {
     '/ledger',
     '/history',
     '/dues',
+    '/stock',
     '/analytics',
     '/reports',
     '/settings'

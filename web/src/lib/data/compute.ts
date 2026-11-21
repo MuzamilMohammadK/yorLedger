@@ -40,7 +40,14 @@ import {
   AppPreferences,
   UpdateShopProfilePayload,
   UpdateGSTSettingsPayload,
-  PaymentStatus
+  PaymentStatus,
+  StockItemSummary,
+  RawMaterialSummary,
+  WeaverAccountSummary,
+  StaffSummary,
+  PolishingBatch,
+  PolishingPersonSummary,
+  StockProductionAnalysis
 } from '@yorbalance/shared';
 import { calculateSummary, calculateCharts } from './analytics';
 import { cache } from './cache';
@@ -1165,6 +1172,518 @@ export const compute = {
       filename: `gst_summary_report_${shopId}_${now}.csv`,
       contentType: 'text/csv',
       data: header + rows
+    };
+  },
+
+  // ---------------- Stock & Production Computations ----------------
+
+  getStockTally(shopId: string, search?: string): StockItemSummary[] {
+    const itemMap = new Map<string, {
+      name: string;
+      opening: number;
+      purchased: number;
+      produced: number;
+      sold: number;
+      sent_to_polish: number;
+      received_from_polish: number;
+      returned: number;
+      unit_price_paise: number;
+    }>();
+
+    const getOrInit = (rawName: string) => {
+      const trimmed = (rawName || '').trim();
+      if (!trimmed) return null;
+      const key = trimmed.toLowerCase();
+      if (!itemMap.has(key)) {
+        itemMap.set(key, {
+          name: trimmed,
+          opening: 0,
+          purchased: 0,
+          produced: 0,
+          sold: 0,
+          sent_to_polish: 0,
+          received_from_polish: 0,
+          returned: 0,
+          unit_price_paise: 0
+        });
+      }
+      return itemMap.get(key)!;
+    };
+
+    // 1. Stock movements (Opening balances & manual adjustments)
+    for (const sm of cache.stockMovements()) {
+      const entry = getOrInit(sm.item_name);
+      if (!entry) continue;
+      if (sm.movement_type === 'OPENING') {
+        entry.opening += sm.qty;
+      } else if (sm.movement_type === 'PRODUCTION') {
+        entry.produced += sm.qty;
+      } else if (sm.movement_type === 'RETURN') {
+        entry.returned += sm.qty;
+      }
+      if (sm.rate_paise && sm.rate_paise > 0) {
+        entry.unit_price_paise = sm.rate_paise;
+      }
+    }
+
+    // 2. Bills (Purchases & Sales)
+    for (const b of cache.rawBills()) {
+      const isPurchase = b.kind === 'PURCHASE';
+      const isSale = b.kind === 'SALE';
+      if (!isPurchase && !isSale) continue;
+
+      for (const it of (b.items || [])) {
+        const entry = getOrInit(it.name);
+        if (!entry) continue;
+        const qty = Number(it.qty) || 0;
+        if (isPurchase) {
+          entry.purchased += qty;
+          if (it.rate && it.rate > 0) entry.unit_price_paise = it.rate;
+        } else if (isSale) {
+          entry.sold += qty;
+          if (!entry.unit_price_paise && it.rate && it.rate > 0) {
+            entry.unit_price_paise = it.rate;
+          }
+        }
+      }
+    }
+
+    // 3. Weaver receipts (Produced finished sarees)
+    for (const tx of cache.weaverTx()) {
+      if (tx.action_type === 'RECEIVE' && tx.sarees_count) {
+        const name = tx.finished_item_name || 'Silk Saree';
+        const entry = getOrInit(name);
+        if (entry) {
+          entry.produced += tx.sarees_count;
+        }
+      }
+    }
+
+    // 4. Polishing batches
+    for (const p of cache.polishing()) {
+      const name = p.item_name || 'Silk Saree';
+      const entry = getOrInit(name);
+      if (entry) {
+        entry.sent_to_polish += p.sarees_sent || 0;
+        entry.received_from_polish += p.sarees_received || 0;
+      }
+    }
+
+    const items: StockItemSummary[] = Array.from(itemMap.values()).map(it => {
+      const closing = it.opening + it.purchased + it.produced - it.sold + it.returned;
+      const inPolish = Math.max(0, it.sent_to_polish - it.received_from_polish);
+      const inHand = closing - inPolish;
+      const threshold = 5;
+      return {
+        item_name: it.name,
+        opening: it.opening,
+        purchased: it.purchased,
+        produced: it.produced,
+        sold: it.sold,
+        sent_to_polish: it.sent_to_polish,
+        received_from_polish: it.received_from_polish,
+        returned: it.returned,
+        closing_balance: closing,
+        in_hand_balance: inHand,
+        low_stock_threshold: threshold,
+        is_low_stock: inHand <= threshold,
+        unit_price_paise: it.unit_price_paise,
+        stock_value_paise: Math.max(0, closing) * it.unit_price_paise
+      };
+    });
+
+    if (search?.trim()) {
+      const q = search.trim().toLowerCase();
+      return items.filter(it => it.item_name.toLowerCase().includes(q));
+    }
+    return items.sort((a, b) => a.item_name.localeCompare(b.item_name));
+  },
+
+  getItemLedger(shopId: string, itemName: string) {
+    const targetKey = itemName.trim().toLowerCase();
+    const rows: Array<{
+      id: string;
+      date: string;
+      type: 'OPENING' | 'PURCHASE' | 'PRODUCTION' | 'SALE' | 'POLISH_SENT' | 'POLISH_RECEIVED' | 'RETURN';
+      ref_no: string;
+      party_name: string;
+      qty_in: number;
+      qty_out: number;
+      running_balance: number;
+      notes?: string | null;
+    }> = [];
+
+    // Opening / manual movements
+    for (const sm of cache.stockMovements()) {
+      if (sm.item_name.trim().toLowerCase() !== targetKey) continue;
+      if (sm.movement_type === 'OPENING') {
+        rows.push({
+          id: sm.id,
+          date: sm.date,
+          type: 'OPENING',
+          ref_no: 'OPN',
+          party_name: 'Opening Stock',
+          qty_in: sm.qty,
+          qty_out: 0,
+          running_balance: 0,
+          notes: sm.notes
+        });
+      } else if (sm.movement_type === 'PRODUCTION') {
+        rows.push({
+          id: sm.id,
+          date: sm.date,
+          type: 'PRODUCTION',
+          ref_no: 'PRD',
+          party_name: 'Production',
+          qty_in: sm.qty,
+          qty_out: 0,
+          running_balance: 0,
+          notes: sm.notes
+        });
+      }
+    }
+
+    // Bills
+    for (const b of cache.rawBills()) {
+      const isPurchase = b.kind === 'PURCHASE';
+      const isSale = b.kind === 'SALE';
+      if (!isPurchase && !isSale) continue;
+
+      const p = cache.rawParty(b.party_id);
+      const partyName = p?.name ?? b.party_name ?? 'Party';
+      const refNo = b.invoice_prefix ? `${b.invoice_prefix}${b.invoice_no}` : String(b.invoice_no);
+
+      for (const it of (b.items || [])) {
+        if ((it.name || '').trim().toLowerCase() !== targetKey) continue;
+        const qty = Number(it.qty) || 0;
+        if (isPurchase) {
+          rows.push({
+            id: `${b.id}-${it.name}`,
+            date: b.bill_date,
+            type: 'PURCHASE',
+            ref_no: refNo,
+            party_name: partyName,
+            qty_in: qty,
+            qty_out: 0,
+            running_balance: 0
+          });
+        } else if (isSale) {
+          rows.push({
+            id: `${b.id}-${it.name}`,
+            date: b.bill_date,
+            type: 'SALE',
+            ref_no: refNo,
+            party_name: partyName,
+            qty_in: 0,
+            qty_out: qty,
+            running_balance: 0
+          });
+        }
+      }
+    }
+
+    // Weaver production
+    for (const tx of cache.weaverTx()) {
+      if (tx.action_type === 'RECEIVE' && tx.sarees_count) {
+        const itName = tx.finished_item_name || 'Silk Saree';
+        if (itName.trim().toLowerCase() !== targetKey) continue;
+        rows.push({
+          id: tx.id,
+          date: tx.date,
+          type: 'PRODUCTION',
+          ref_no: `WVR-${tx.weaver_name}`,
+          party_name: tx.weaver_name,
+          qty_in: tx.sarees_count,
+          qty_out: 0,
+          running_balance: 0,
+          notes: tx.notes
+        });
+      }
+    }
+
+    // Polishing
+    for (const pol of cache.polishing()) {
+      const itName = pol.item_name || 'Silk Saree';
+      if (itName.trim().toLowerCase() !== targetKey) continue;
+      if (pol.sarees_sent > 0) {
+        rows.push({
+          id: `${pol.id}-sent`,
+          date: pol.sent_date,
+          type: 'POLISH_SENT',
+          ref_no: `POL-${pol.person_name}`,
+          party_name: `Polishing: ${pol.person_name}`,
+          qty_in: 0,
+          qty_out: pol.sarees_sent,
+          running_balance: 0,
+          notes: pol.notes
+        });
+      }
+      if (pol.sarees_received > 0) {
+        rows.push({
+          id: `${pol.id}-recv`,
+          date: pol.received_date || pol.sent_date,
+          type: 'POLISH_RECEIVED',
+          ref_no: `POL-${pol.person_name}`,
+          party_name: `Polishing: ${pol.person_name}`,
+          qty_in: pol.sarees_received,
+          qty_out: 0,
+          running_balance: 0,
+          notes: pol.notes
+        });
+      }
+    }
+
+    // Sort chronologically ascending
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calculate running balance
+    let running = 0;
+    for (const r of rows) {
+      running += (r.qty_in - r.qty_out);
+      r.running_balance = running;
+    }
+
+    return rows;
+  },
+
+  getRawMaterialsSummary(shopId: string): RawMaterialSummary[] {
+    const mats = cache.rawMaterials();
+    const txs = cache.rawMaterialTx();
+
+    return mats.map(m => {
+      let purchased_kg = 0;
+      let issued_kg = 0;
+      let returned_kg = 0;
+      let wastage_kg = 0;
+
+      for (const tx of txs) {
+        if (tx.material_id !== m.id) continue;
+        if (tx.tx_type === 'PURCHASE') purchased_kg += tx.qty_kg;
+        else if (tx.tx_type === 'ISSUE_WEAVER') issued_kg += tx.qty_kg;
+        else if (tx.tx_type === 'RETURN') returned_kg += tx.qty_kg;
+        else if (tx.tx_type === 'WASTAGE') wastage_kg += tx.qty_kg;
+      }
+
+      const balance_kg = Math.max(0, purchased_kg + returned_kg - issued_kg - wastage_kg);
+      const stock_value_paise = Math.round(balance_kg * m.unit_price_paise);
+
+      return {
+        material: m,
+        purchased_kg,
+        issued_kg,
+        returned_kg,
+        wastage_kg,
+        balance_kg,
+        stock_value_paise
+      };
+    });
+  },
+
+  getWeaversSummary(shopId: string): WeaverAccountSummary[] {
+    const weavers = cache.weavers();
+    const txs = cache.weaverTx();
+    const rawTx = cache.rawMaterialTx();
+
+    return weavers.map(w => {
+      let material_issued_kg = 0;
+      let material_returned_kg = 0;
+      let wastage_kg = 0;
+      let sarees_received = 0;
+      let wages_earned_paise = 0;
+      let wages_paid_paise = 0;
+
+      for (const tx of txs) {
+        if (tx.weaver_id !== w.id) continue;
+        if (tx.action_type === 'ISSUE') {
+          material_issued_kg += (tx.qty_kg || 0);
+        } else if (tx.action_type === 'RECEIVE') {
+          sarees_received += (tx.sarees_count || 0);
+          wastage_kg += (tx.wastage_kg || 0);
+          wages_earned_paise += (tx.wage_amount_paise || 0);
+        } else if (tx.action_type === 'WAGE_PAYMENT') {
+          wages_paid_paise += (tx.payment_amount_paise || 0);
+        }
+      }
+
+      // Check if any returned materials recorded under rawMaterialTx
+      for (const rtx of rawTx) {
+        if (rtx.weaver_id === w.id && rtx.tx_type === 'RETURN') {
+          material_returned_kg += rtx.qty_kg;
+        }
+      }
+
+      const pending_material_kg = Math.max(0, material_issued_kg - material_returned_kg - wastage_kg);
+      const wages_due_paise = Math.max(0, wages_earned_paise - wages_paid_paise);
+
+      return {
+        weaver: w,
+        material_issued_kg,
+        material_returned_kg,
+        wastage_kg,
+        pending_material_kg,
+        sarees_received,
+        wages_earned_paise,
+        wages_paid_paise,
+        wages_due_paise
+      };
+    });
+  },
+
+  getStaffSummary(shopId: string): StaffSummary[] {
+    const staffList = cache.staff();
+    const records = cache.staffRecords();
+    const currentMonthPrefix = todayIST().slice(0, 7); // YYYY-MM
+
+    return staffList.map(s => {
+      let total_advances_paise = 0;
+      let days_present_this_month = 0;
+
+      for (const r of records) {
+        if (r.staff_id !== s.id) continue;
+        if (r.record_type === 'ADVANCE') {
+          total_advances_paise += (r.amount_paise || 0);
+        } else if (r.record_type === 'ATTENDANCE' && r.date.startsWith(currentMonthPrefix)) {
+          if (r.attendance_status === 'PRESENT') days_present_this_month += 1;
+          else if (r.attendance_status === 'HALF_DAY') days_present_this_month += 0.5;
+        }
+      }
+
+      let estimatedEarned = s.wage_amount_paise;
+      if (s.wage_type === 'DAILY') {
+        estimatedEarned = days_present_this_month * s.wage_amount_paise;
+      }
+      const pending_salary_paise = Math.max(0, estimatedEarned - total_advances_paise);
+
+      return {
+        staff: s,
+        total_advances_paise,
+        days_present_this_month,
+        pending_salary_paise
+      };
+    });
+  },
+
+  getPolishingSummary(shopId: string, filter?: { from?: string; to?: string }) {
+    let batches = cache.polishing();
+
+    if (filter?.from) {
+      batches = batches.filter(b => b.sent_date >= filter.from!);
+    }
+    if (filter?.to) {
+      batches = batches.filter(b => b.sent_date <= filter.to!);
+    }
+
+    const total_entries = batches.length;
+    const total_sarees_sent = batches.reduce((sum, b) => sum + b.sarees_sent, 0);
+    const total_sarees_received = batches.reduce((sum, b) => sum + b.sarees_received, 0);
+    const pending_sarees = Math.max(0, total_sarees_sent - total_sarees_received);
+    const total_cost_paise = batches.reduce((sum, b) => sum + b.total_amount_paise, 0);
+
+    const personMap = new Map<string, PolishingPersonSummary>();
+    for (const b of batches) {
+      const pName = b.person_name.trim();
+      if (!personMap.has(pName)) {
+        personMap.set(pName, {
+          person_name: pName,
+          total_batches: 0,
+          total_sent: 0,
+          total_received: 0,
+          pending_sarees: 0,
+          total_cost_paise: 0
+        });
+      }
+      const entry = personMap.get(pName)!;
+      entry.total_batches += 1;
+      entry.total_sent += b.sarees_sent;
+      entry.total_received += b.sarees_received;
+      entry.pending_sarees += Math.max(0, b.sarees_sent - b.sarees_received);
+      entry.total_cost_paise += b.total_amount_paise;
+    }
+
+    return {
+      batches: batches.sort((a, b) => b.sent_date.localeCompare(a.sent_date)),
+      totals: {
+        total_entries,
+        total_sarees_sent,
+        total_sarees_received,
+        pending_sarees,
+        total_cost_paise
+      },
+      person_summaries: Array.from(personMap.values())
+    };
+  },
+
+  getStockProductionAnalysis(shopId: string, dateRange?: { from?: string; to?: string }): StockProductionAnalysis {
+    const tally = this.getStockTally(shopId);
+    const rawSummary = this.getRawMaterialsSummary(shopId);
+    const weaverSummary = this.getWeaversSummary(shopId);
+    const polishingSummary = this.getPolishingSummary(shopId, dateRange);
+
+    const finishedStockValue = tally.reduce((sum, t) => sum + t.stock_value_paise, 0);
+    const rawStockValue = rawSummary.reduce((sum, r) => sum + r.stock_value_paise, 0);
+    const stock_value_paise = finishedStockValue + rawStockValue;
+
+    const sarees_in_stock = tally.reduce((sum, t) => sum + t.closing_balance, 0);
+    const sarees_at_polishing = polishingSummary.totals.pending_sarees;
+    const sarees_with_weavers = Math.round(weaverSummary.reduce((sum, w) => sum + w.pending_material_kg, 0) / 0.5); // approximate ~500g per saree
+    const raw_material_balance_kg = rawSummary.reduce((sum, r) => sum + r.balance_kg, 0);
+
+    // Monthly trends (past 6 months)
+    const months: string[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(d.toISOString().slice(0, 7)); // YYYY-MM
+    }
+
+    const monthly_comparison = months.map(m => {
+      let purchased = 0;
+      let sold = 0;
+      let produced = 0;
+
+      for (const b of cache.rawBills()) {
+        if (!b.bill_date.startsWith(m)) continue;
+        const count = (b.items || []).reduce((sum: number, it: any) => sum + (Number(it.qty) || 0), 0);
+        if (b.kind === 'PURCHASE') purchased += count;
+        else if (b.kind === 'SALE') sold += count;
+      }
+
+      for (const tx of cache.weaverTx()) {
+        if (tx.action_type === 'RECEIVE' && tx.date.startsWith(m)) {
+          produced += (tx.sarees_count || 0);
+        }
+      }
+
+      const [y, mm] = m.split('-');
+      const monthLabel = new Date(parseInt(y, 10), parseInt(mm, 10) - 1, 1).toLocaleString('default', { month: 'short' });
+      return {
+        month: monthLabel,
+        purchased,
+        produced,
+        sold
+      };
+    });
+
+    const polishing_cost_by_person = polishingSummary.person_summaries.map(p => ({
+      person: p.person_name,
+      cost_rupees: p.total_cost_paise / 100,
+      sarees: p.total_sent
+    }));
+
+    const raw_material_by_weaver = weaverSummary.map(w => ({
+      weaver: w.weaver.name,
+      kg: w.material_issued_kg
+    }));
+
+    return {
+      stock_value_paise,
+      sarees_in_stock,
+      sarees_with_weavers,
+      sarees_at_polishing,
+      raw_material_balance_kg,
+      monthly_comparison,
+      polishing_cost_by_person,
+      raw_material_by_weaver
     };
   }
 };

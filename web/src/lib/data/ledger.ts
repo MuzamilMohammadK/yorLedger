@@ -9,7 +9,8 @@ import {
   CreateBillPayload, CreatePartyPayload, InvoiceSettings, NotificationSettings, AppPreferences,
   Party, PaymentPayload, ReturnPayload, Shop, ShopSettingsData, UpdatePartyPayload,
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, computeTax, computeReturn,
-  normalizeInvoice, normalizePhone, validateGSTIN, getStateCodeByName, validatePayment
+  normalizeInvoice, normalizePhone, validateGSTIN, getStateCodeByName, validatePayment,
+  StockMovementType, RawMaterialTxType, LoomType, WeaverTxType, StaffWageType, StaffRecordType, PolishingStatus
 } from '@yorbalance/shared';
 import { auth, db } from '../firebase';
 import { cache } from './cache';
@@ -377,4 +378,345 @@ export async function updateGSTSettings(shopId: string, payload: UpdateGSTSettin
   }
   const after = await getDoc(doc(db, 'shops', shopId));
   return shopFromDoc(after.id, after.data()!);
+}
+
+// ---------------- Stock & Production ----------------
+
+export async function recordStockMovement(shopId: string, payload: {
+  item_name: string;
+  movement_type: StockMovementType;
+  qty: number;
+  rate_paise?: number;
+  date?: string;
+  notes?: string | null;
+}) {
+  if (!payload.item_name?.trim()) throw new AppError('Item name is required', 'VALIDATION_ERROR', { item_name: 'Required' });
+  if (!payload.qty || payload.qty <= 0) throw new AppError('Quantity must be greater than zero', 'VALIDATION_ERROR', { qty: 'Must be > 0' });
+
+  const r = doc(col(shopId, 'stockMovements'));
+  await setDoc(r, {
+    item_name: payload.item_name.trim(),
+    movement_type: payload.movement_type,
+    qty: Math.floor(payload.qty),
+    rate_paise: payload.rate_paise != null ? Math.floor(payload.rate_paise) : null,
+    date: payload.date || todayIST(),
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function createRawMaterial(shopId: string, payload: {
+  name: string;
+  unit?: string;
+  unit_price_paise: number;
+  low_stock_threshold_kg?: number;
+}) {
+  if (!payload.name?.trim()) throw new AppError('Material name is required', 'VALIDATION_ERROR', { name: 'Required' });
+  if (payload.unit_price_paise < 0) throw new AppError('Unit price cannot be negative', 'VALIDATION_ERROR', { unit_price_paise: 'Invalid' });
+
+  const r = doc(col(shopId, 'rawMaterials'));
+  await setDoc(r, {
+    name: payload.name.trim(),
+    unit: payload.unit?.trim() || 'kg',
+    unit_price_paise: Math.floor(payload.unit_price_paise),
+    low_stock_threshold_kg: payload.low_stock_threshold_kg != null ? Number(payload.low_stock_threshold_kg) : 5,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function updateRawMaterial(shopId: string, materialId: string, payload: Partial<{
+  name: string;
+  unit_price_paise: number;
+  low_stock_threshold_kg: number;
+}>) {
+  const patch: Record<string, unknown> = { updated_at: serverTimestamp() };
+  if (payload.name !== undefined) patch.name = payload.name.trim();
+  if (payload.unit_price_paise !== undefined) patch.unit_price_paise = Math.floor(payload.unit_price_paise);
+  if (payload.low_stock_threshold_kg !== undefined) patch.low_stock_threshold_kg = Number(payload.low_stock_threshold_kg);
+
+  await updateDoc(ref(shopId, 'rawMaterials', materialId), patch);
+}
+
+export async function recordRawMaterialTx(shopId: string, payload: {
+  material_id: string;
+  tx_type: RawMaterialTxType;
+  qty_kg: number;
+  rate_per_kg_paise: number;
+  weaver_id?: string | null;
+  date?: string;
+  ref_no?: string | null;
+  notes?: string | null;
+}) {
+  if (!payload.material_id) throw new AppError('Material is required', 'VALIDATION_ERROR', { material_id: 'Required' });
+  if (!payload.qty_kg || payload.qty_kg <= 0) throw new AppError('Quantity must be greater than zero', 'VALIDATION_ERROR', { qty_kg: 'Must be > 0' });
+
+  const mat = cache.rawMaterials().find(m => m.id === payload.material_id);
+  const total_amount_paise = Math.round(payload.qty_kg * payload.rate_per_kg_paise);
+
+  const r = doc(col(shopId, 'rawMaterialTx'));
+  await setDoc(r, {
+    material_id: payload.material_id,
+    material_name: mat?.name ?? 'Material',
+    tx_type: payload.tx_type,
+    qty_kg: payload.qty_kg,
+    rate_per_kg_paise: Math.floor(payload.rate_per_kg_paise),
+    total_amount_paise,
+    weaver_id: payload.weaver_id || null,
+    date: payload.date || todayIST(),
+    ref_no: payload.ref_no?.trim() || null,
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function createWeaver(shopId: string, payload: {
+  name: string;
+  phone: string;
+  address?: string;
+  type: LoomType;
+  looms_count: number;
+  notes?: string | null;
+}) {
+  if (!payload.name?.trim()) throw new AppError('Weaver name is required', 'VALIDATION_ERROR', { name: 'Required' });
+  if (!payload.phone?.trim()) throw new AppError('Phone number is required', 'VALIDATION_ERROR', { phone: 'Required' });
+
+  const r = doc(col(shopId, 'weavers'));
+  await setDoc(r, {
+    name: payload.name.trim(),
+    phone: payload.phone.trim(),
+    address: payload.address?.trim() || '',
+    type: payload.type || 'HANDLOOM',
+    looms_count: Math.max(1, Math.floor(payload.looms_count || 1)),
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function updateWeaver(shopId: string, weaverId: string, payload: Partial<{
+  name: string;
+  phone: string;
+  address: string;
+  type: LoomType;
+  looms_count: number;
+  notes: string | null;
+}>) {
+  const patch: Record<string, unknown> = { updated_at: serverTimestamp() };
+  if (payload.name !== undefined) patch.name = payload.name.trim();
+  if (payload.phone !== undefined) patch.phone = payload.phone.trim();
+  if (payload.address !== undefined) patch.address = payload.address.trim();
+  if (payload.type !== undefined) patch.type = payload.type;
+  if (payload.looms_count !== undefined) patch.looms_count = Math.max(1, Math.floor(payload.looms_count));
+  if (payload.notes !== undefined) patch.notes = payload.notes?.trim() || null;
+
+  await updateDoc(ref(shopId, 'weavers', weaverId), patch);
+}
+
+export async function updateOwnLooms(shopId: string, payload: {
+  handloom_running: number;
+  handloom_idle: number;
+  handloom_repair: number;
+  powerloom_running: number;
+  powerloom_idle: number;
+  powerloom_repair: number;
+}) {
+  const r = ref(shopId, 'ownLooms', 'current');
+  await setDoc(r, {
+    handloom_running: Math.max(0, Math.floor(payload.handloom_running || 0)),
+    handloom_idle: Math.max(0, Math.floor(payload.handloom_idle || 0)),
+    handloom_repair: Math.max(0, Math.floor(payload.handloom_repair || 0)),
+    powerloom_running: Math.max(0, Math.floor(payload.powerloom_running || 0)),
+    powerloom_idle: Math.max(0, Math.floor(payload.powerloom_idle || 0)),
+    powerloom_repair: Math.max(0, Math.floor(payload.powerloom_repair || 0)),
+    updated_at: serverTimestamp()
+  }, { merge: true });
+}
+
+export async function recordWeaverTx(shopId: string, payload: {
+  weaver_id: string;
+  action_type: WeaverTxType;
+  date?: string;
+  material_id?: string | null;
+  qty_kg?: number;
+  unit_price_paise?: number;
+  finished_item_name?: string;
+  sarees_count?: number;
+  wastage_kg?: number;
+  wage_amount_paise?: number;
+  payment_amount_paise?: number;
+  payment_mode?: 'CASH' | 'CHEQUE' | 'NEFT' | 'UPI';
+  notes?: string | null;
+}) {
+  if (!payload.weaver_id) throw new AppError('Weaver is required', 'VALIDATION_ERROR', { weaver_id: 'Required' });
+
+  const w = cache.weavers().find(x => x.id === payload.weaver_id);
+  const data: Record<string, unknown> = {
+    weaver_id: payload.weaver_id,
+    weaver_name: w?.name ?? 'Weaver',
+    action_type: payload.action_type,
+    date: payload.date || todayIST(),
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp()
+  };
+
+  if (payload.action_type === 'ISSUE') {
+    if (!payload.material_id) throw new AppError('Material is required for issue', 'VALIDATION_ERROR', { material_id: 'Required' });
+    if (!payload.qty_kg || payload.qty_kg <= 0) throw new AppError('Quantity must be > 0', 'VALIDATION_ERROR', { qty_kg: 'Must be > 0' });
+    const mat = cache.rawMaterials().find(m => m.id === payload.material_id);
+    const unitPrice = payload.unit_price_paise != null ? Math.floor(payload.unit_price_paise) : (mat?.unit_price_paise ?? 0);
+    data.material_id = payload.material_id;
+    data.material_name = mat?.name ?? 'Material';
+    data.qty_kg = payload.qty_kg;
+    data.unit_price_paise = unitPrice;
+    data.total_material_paise = Math.round(payload.qty_kg * unitPrice);
+
+    // Also mirror to rawMaterialTx as ISSUE_WEAVER
+    await recordRawMaterialTx(shopId, {
+      material_id: payload.material_id,
+      tx_type: 'ISSUE_WEAVER',
+      qty_kg: payload.qty_kg,
+      rate_per_kg_paise: unitPrice,
+      weaver_id: payload.weaver_id,
+      date: payload.date,
+      notes: payload.notes
+    });
+  } else if (payload.action_type === 'RECEIVE') {
+    if (!payload.sarees_count || payload.sarees_count <= 0) throw new AppError('Sarees count must be > 0', 'VALIDATION_ERROR', { sarees_count: 'Must be > 0' });
+    data.finished_item_name = payload.finished_item_name?.trim() || 'Silk Saree';
+    data.sarees_count = Math.floor(payload.sarees_count);
+    data.wastage_kg = payload.wastage_kg != null ? Number(payload.wastage_kg) : 0;
+    data.wage_amount_paise = payload.wage_amount_paise != null ? Math.floor(payload.wage_amount_paise) : 0;
+  } else if (payload.action_type === 'WAGE_PAYMENT') {
+    if (!payload.payment_amount_paise || payload.payment_amount_paise <= 0) throw new AppError('Payment amount must be > 0', 'VALIDATION_ERROR', { payment_amount_paise: 'Must be > 0' });
+    data.payment_amount_paise = Math.floor(payload.payment_amount_paise);
+    data.payment_mode = payload.payment_mode || 'CASH';
+  }
+
+  const r = doc(col(shopId, 'weaverTx'));
+  await setDoc(r, data);
+  return r.id;
+}
+
+export async function createStaff(shopId: string, payload: {
+  name: string;
+  role: string;
+  phone: string;
+  wage_type: StaffWageType;
+  wage_amount_paise: number;
+  joining_date?: string;
+}) {
+  if (!payload.name?.trim()) throw new AppError('Staff name is required', 'VALIDATION_ERROR', { name: 'Required' });
+
+  const r = doc(col(shopId, 'staff'));
+  await setDoc(r, {
+    name: payload.name.trim(),
+    role: payload.role?.trim() || 'Staff',
+    phone: payload.phone?.trim() || '',
+    wage_type: payload.wage_type || 'MONTHLY',
+    wage_amount_paise: Math.max(0, Math.floor(payload.wage_amount_paise || 0)),
+    joining_date: payload.joining_date || todayIST(),
+    status: 'ACTIVE',
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function updateStaff(shopId: string, staffId: string, payload: Partial<{
+  name: string;
+  role: string;
+  phone: string;
+  wage_type: StaffWageType;
+  wage_amount_paise: number;
+  status: 'ACTIVE' | 'INACTIVE';
+}>) {
+  const patch: Record<string, unknown> = { updated_at: serverTimestamp() };
+  if (payload.name !== undefined) patch.name = payload.name.trim();
+  if (payload.role !== undefined) patch.role = payload.role.trim();
+  if (payload.phone !== undefined) patch.phone = payload.phone.trim();
+  if (payload.wage_type !== undefined) patch.wage_type = payload.wage_type;
+  if (payload.wage_amount_paise !== undefined) patch.wage_amount_paise = Math.floor(payload.wage_amount_paise);
+  if (payload.status !== undefined) patch.status = payload.status;
+
+  await updateDoc(ref(shopId, 'staff', staffId), patch);
+}
+
+export async function recordStaffRecord(shopId: string, payload: {
+  staff_id: string;
+  record_type: StaffRecordType;
+  date?: string;
+  attendance_status?: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
+  amount_paise?: number;
+  notes?: string | null;
+}) {
+  if (!payload.staff_id) throw new AppError('Staff is required', 'VALIDATION_ERROR', { staff_id: 'Required' });
+  const s = cache.staff().find(x => x.id === payload.staff_id);
+
+  const r = doc(col(shopId, 'staffRecords'));
+  await setDoc(r, {
+    staff_id: payload.staff_id,
+    staff_name: s?.name ?? 'Staff',
+    record_type: payload.record_type,
+    date: payload.date || todayIST(),
+    attendance_status: payload.attendance_status ?? null,
+    amount_paise: payload.amount_paise != null ? Math.floor(payload.amount_paise) : null,
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function createPolishingBatch(shopId: string, payload: {
+  person_name: string;
+  item_name: string;
+  sarees_sent: number;
+  unit_price_paise: number;
+  sent_date?: string;
+  notes?: string | null;
+}) {
+  if (!payload.person_name?.trim()) throw new AppError('Person name is required', 'VALIDATION_ERROR', { person_name: 'Required' });
+  if (!payload.sarees_sent || payload.sarees_sent <= 0) throw new AppError('Number of sarees must be > 0', 'VALIDATION_ERROR', { sarees_sent: 'Must be > 0' });
+
+  const total_amount_paise = Math.round(payload.sarees_sent * payload.unit_price_paise);
+  const r = doc(col(shopId, 'polishing'));
+  await setDoc(r, {
+    person_name: payload.person_name.trim(),
+    item_name: payload.item_name?.trim() || 'Silk Saree',
+    sarees_sent: Math.floor(payload.sarees_sent),
+    sarees_received: 0,
+    unit_price_paise: Math.floor(payload.unit_price_paise),
+    total_amount_paise,
+    sent_date: payload.sent_date || todayIST(),
+    received_date: null,
+    status: 'PENDING',
+    notes: payload.notes?.trim() || null,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
+  return r.id;
+}
+
+export async function updatePolishingBatch(shopId: string, batchId: string, payload: {
+  sarees_received: number;
+  received_date?: string;
+  notes?: string | null;
+}) {
+  const cur = cache.polishing().find(p => p.id === batchId);
+  if (!cur) throw new AppError('Polishing batch not found', 'NOT_FOUND');
+
+  const newReceived = Math.min(cur.sarees_sent, Math.max(0, Math.floor(payload.sarees_received)));
+  const status: PolishingStatus = newReceived >= cur.sarees_sent ? 'RECEIVED' : (newReceived > 0 ? 'PARTIAL' : 'PENDING');
+
+  await updateDoc(ref(shopId, 'polishing', batchId), {
+    sarees_received: newReceived,
+    received_date: payload.received_date || (newReceived > 0 ? todayIST() : null),
+    status,
+    notes: payload.notes !== undefined ? (payload.notes?.trim() || null) : cur.notes,
+    updated_at: serverTimestamp()
+  });
 }

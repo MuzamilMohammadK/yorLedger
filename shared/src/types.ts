@@ -637,3 +637,230 @@ export interface ShopDocument {
 
 /** New document chosen in the form, not yet saved. */
 export interface ShopDocumentUpload { type: ShopDocumentType; data_url: string; file_name: string }
+
+// -------------------------------------------------------------
+// Stock & Production Module Models
+// -------------------------------------------------------------
+
+export type StockMovementType =
+  | 'OPENING'
+  | 'PURCHASE'
+  | 'PRODUCTION'
+  | 'SALE'
+  | 'POLISH_OUT'
+  | 'POLISH_IN'
+  | 'RETURN';
+
+export interface StockMovement {
+  id: string;
+  shop_id: string;
+  item_name: string;
+  movement_type: StockMovementType;
+  qty: number;
+  rate_paise?: number;
+  ref_id?: string | null;
+  ref_no?: string | null;
+  date: string; // YYYY-MM-DD
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface StockItemSummary {
+  item_name: string;
+  opening: number;
+  purchased: number;
+  produced: number;
+  sold: number;
+  sent_to_polish: number;
+  received_from_polish: number;
+  returned: number;
+  closing_balance: number;
+  in_hand_balance: number; // Closing minus pending in polish
+  low_stock_threshold: number;
+  is_low_stock: boolean;
+  unit_price_paise?: number;
+  stock_value_paise: number;
+}
+
+export interface RawMaterial {
+  id: string;
+  shop_id: string;
+  name: string; // e.g. Silk Yarn 20/22, Silver Zari
+  unit: string; // 'kg'
+  unit_price_paise: number; // paise per kg
+  low_stock_threshold_kg?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type RawMaterialTxType = 'PURCHASE' | 'ISSUE_WEAVER' | 'RETURN' | 'WASTAGE';
+
+export interface RawMaterialTx {
+  id: string;
+  shop_id: string;
+  material_id: string;
+  material_name: string;
+  tx_type: RawMaterialTxType;
+  qty_kg: number;
+  rate_per_kg_paise: number;
+  total_amount_paise: number;
+  weaver_id?: string | null;
+  weaver_name?: string | null;
+  date: string; // YYYY-MM-DD
+  ref_no?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface RawMaterialSummary {
+  material: RawMaterial;
+  purchased_kg: number;
+  issued_kg: number;
+  returned_kg: number;
+  wastage_kg: number;
+  balance_kg: number;
+  stock_value_paise: number;
+}
+
+export type LoomType = 'HANDLOOM' | 'POWERLOOM';
+
+export interface Weaver {
+  id: string;
+  shop_id: string;
+  name: string;
+  phone: string;
+  address: string;
+  type: LoomType;
+  looms_count: number;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface OwnLoomRegister {
+  id: string;
+  shop_id: string;
+  handloom_running: number;
+  handloom_idle: number;
+  handloom_repair: number;
+  powerloom_running: number;
+  powerloom_idle: number;
+  powerloom_repair: number;
+  updated_at: string;
+}
+
+export type WeaverTxType = 'ISSUE' | 'RECEIVE' | 'WAGE_PAYMENT';
+
+export interface WeaverTransaction {
+  id: string;
+  shop_id: string;
+  weaver_id: string;
+  weaver_name: string;
+  action_type: WeaverTxType;
+  date: string; // YYYY-MM-DD
+  // For ISSUE:
+  material_id?: string | null;
+  material_name?: string | null;
+  qty_kg?: number;
+  unit_price_paise?: number;
+  total_material_paise?: number;
+  // For RECEIVE:
+  finished_item_name?: string;
+  sarees_count?: number;
+  wastage_kg?: number;
+  wage_amount_paise?: number;
+  // For WAGE_PAYMENT:
+  payment_amount_paise?: number;
+  payment_mode?: 'CASH' | 'CHEQUE' | 'NEFT' | 'UPI';
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface WeaverAccountSummary {
+  weaver: Weaver;
+  material_issued_kg: number;
+  material_returned_kg: number;
+  wastage_kg: number;
+  pending_material_kg: number;
+  sarees_received: number;
+  wages_earned_paise: number;
+  wages_paid_paise: number;
+  wages_due_paise: number;
+}
+
+export type StaffWageType = 'MONTHLY' | 'DAILY' | 'PIECE_RATE';
+
+export interface Staff {
+  id: string;
+  shop_id: string;
+  name: string;
+  role: string; // Master Weaver, Designer, Sales, Helper, Accountant
+  phone: string;
+  wage_type: StaffWageType;
+  wage_amount_paise: number;
+  joining_date: string; // YYYY-MM-DD
+  status: 'ACTIVE' | 'INACTIVE';
+  created_at: string;
+  updated_at?: string;
+}
+
+export type StaffRecordType = 'ATTENDANCE' | 'ADVANCE' | 'SALARY_PAY';
+
+export interface StaffRecord {
+  id: string;
+  shop_id: string;
+  staff_id: string;
+  staff_name: string;
+  record_type: StaffRecordType;
+  date: string; // YYYY-MM-DD
+  attendance_status?: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
+  amount_paise?: number;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface StaffSummary {
+  staff: Staff;
+  total_advances_paise: number;
+  days_present_this_month: number;
+  pending_salary_paise: number;
+}
+
+export type PolishingStatus = 'PENDING' | 'RECEIVED' | 'PARTIAL';
+
+export interface PolishingBatch {
+  id: string;
+  shop_id: string;
+  person_name: string;
+  item_name: string;
+  sarees_sent: number;
+  sarees_received: number;
+  unit_price_paise: number; // Cost per saree
+  total_amount_paise: number; // sarees_sent * unit_price_paise
+  sent_date: string;
+  received_date?: string | null;
+  status: PolishingStatus;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PolishingPersonSummary {
+  person_name: string;
+  total_batches: number;
+  total_sent: number;
+  total_received: number;
+  pending_sarees: number;
+  total_cost_paise: number;
+}
+
+export interface StockProductionAnalysis {
+  stock_value_paise: number;
+  sarees_in_stock: number;
+  sarees_with_weavers: number;
+  sarees_at_polishing: number;
+  raw_material_balance_kg: number;
+  monthly_comparison: Array<{ month: string; purchased: number; produced: number; sold: number }>;
+  polishing_cost_by_person: Array<{ person: string; cost_rupees: number; sarees: number }>;
+  raw_material_by_weaver: Array<{ weaver: string; kg: number }>;
+}

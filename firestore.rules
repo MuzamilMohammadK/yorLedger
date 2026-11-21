@@ -248,6 +248,35 @@ service cloud.firestore {
         allow read: if approvedOwner(shopId);
         allow write: if approvedOwner(shopId) && docId in ['invoice', 'notifications', 'preferences'];
       }
+
+      // ---------- stock & production ----------
+      match /stockMovements/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /rawMaterials/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /rawMaterialTx/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /weavers/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /ownLooms/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /weaverTx/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /staff/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /staffRecords/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /polishing/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
     }
   }
 }
