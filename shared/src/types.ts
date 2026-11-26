@@ -1,4 +1,5 @@
-export type ShopStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type ShopStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type AdminRole = 'super_admin' | 'support' | 'viewer';
 export type UserRole = 'OWNER' | 'ADMIN';
 
 export interface Shop {
@@ -109,6 +110,8 @@ export interface Party {
   state_code: string;
   pin_code: string;
   notes?: string | null;
+  loom_type?: LoomType; // 'HANDLOOM' | 'POWERLOOM' for ARTISAN/Weaver
+  looms_count?: number; // count of looms operated
   joined_on?: string; // YYYY-MM-DD (IST) — date the party was added (§7.2 calendar)
   current_balance?: number; // Outstanding amount in Rupees
   balance_type?: 'RECEIVABLE' | 'PAYABLE' | 'SETTLED';
@@ -117,7 +120,7 @@ export interface Party {
 }
 
 export interface CreatePartyPayload {
-  name: string; // Shop / Business Name
+  name: string; // Shop / Business Name or Weaver Name
   type: PartyType;
   owner_name: string;
   phone: string;
@@ -128,6 +131,8 @@ export interface CreatePartyPayload {
   state_code?: string;
   pin_code: string;
   notes?: string | null;
+  loom_type?: LoomType;
+  looms_count?: number;
 }
 
 export interface UpdatePartyPayload {
@@ -142,6 +147,8 @@ export interface UpdatePartyPayload {
   state_code?: string;
   pin_code?: string;
   notes?: string | null;
+  loom_type?: LoomType;
+  looms_count?: number;
 }
 
 export interface DuplicatePartyCheckResult {
@@ -159,6 +166,7 @@ export interface TransactionItem {
   rate_paise: number;
   gst_rate_bp: number;
   amount_paise: number;
+  hsn_code?: string | null;
 }
 
 export interface PaymentRecord {
@@ -182,6 +190,13 @@ export interface PaymentRecord {
   created_at: string;
 }
 
+export interface ReturnItemSummary {
+  index: number;
+  name: string;
+  qty: number;
+  rate_paise?: number;
+}
+
 export interface ReturnRecord {
   id: string;
   shop_id: string;
@@ -189,6 +204,12 @@ export interface ReturnRecord {
   party_id: string;
   amount_paise: number;
   amount_rupees: number;
+  taxable_paise?: number;
+  cgst_paise?: number;
+  sgst_paise?: number;
+  igst_paise?: number;
+  tax_paise?: number;
+  items?: ReturnItemSummary[];
   reason?: string | null;
   return_date: string;
   created_at: string;
@@ -215,6 +236,9 @@ export interface Transaction {
   return_paise?: number;
   pending_paise: number;
   status: PaymentStatus;
+  party_phone?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
   hsn_code?: string | null;  // 4–8 digit HSN/SAC code (§1.3)
   items?: TransactionItem[];
   payments?: PaymentRecord[];
@@ -380,6 +404,7 @@ export interface DashboardCharts {
 // -------------------------------------------------------------
 
 export interface ReportFilterOptions {
+  allTime?: boolean;
   from?: string; // YYYY-MM-DD
   to?: string;   // YYYY-MM-DD
   financialYear?: string; // e.g. "2025-2026", "2026-2027"
@@ -441,8 +466,24 @@ export interface SalesLedgerItem {
   payment_status: PaymentStatus;
 }
 
+export interface SalesReturnLedgerItem {
+  id: string;
+  bill_id: string;
+  invoice_number: string;
+  customer_name: string;
+  return_date: string;
+  reason?: string | null;
+  taxable_value: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total_gst: number;
+  total_amount: number;
+}
+
 export interface SalesLedgerReport {
   items: SalesLedgerItem[];
+  sales_returns?: SalesReturnLedgerItem[];
   totals: {
     total_taxable_sales: number;
     total_cgst: number;
@@ -454,6 +495,12 @@ export interface SalesLedgerReport {
     total_outstanding_due: number;
     intra_state_sales: number;
     inter_state_sales: number;
+    return_taxable?: number;
+    return_cgst?: number;
+    return_sgst?: number;
+    return_igst?: number;
+    return_gst?: number;
+    total_returns?: number;
   };
   period: { from: string; to: string; label?: string };
 }
@@ -507,6 +554,12 @@ export interface GSTDashboardData {
     output_cgst: number;
     output_sgst: number;
     output_igst: number;
+    gross_output_cgst?: number;
+    gross_output_sgst?: number;
+    gross_output_igst?: number;
+    return_cgst?: number;
+    return_sgst?: number;
+    return_igst?: number;
     input_cgst: number;
     input_sgst: number;
     input_igst: number;
@@ -550,6 +603,7 @@ export interface AppPreferences {
   theme: 'light' | 'dark' | 'system';
   language: string; // 'en' | 'te' | 'ta' | 'kn' | 'hi'
   default_landing_page: string; // '/dashboard' | '/ledger' | '/dues'
+  item_hsn_map?: Record<string, string>; // lowercase item name -> 4-8 digit HSN/SAC code
 }
 
 export interface ShopSettingsData {
@@ -587,11 +641,14 @@ export interface BillItemPayload {
   name: string;
   qty: number;   // > 0
   rate: number;  // paise, >= 0
+  hsn_code?: string | null; // 4-8 digit HSN/SAC code (optional)
 }
 
 export interface CreateBillPayload {
   kind: BillKind;
   party_id: string;
+  customer_name?: string;
+  customer_phone?: string;
   invoice_no: string;        // digits; normalized (leading zeros stripped)
   invoice_prefix?: string;   // prefix prepended for display (§1.2)
   bill_date: string;         // YYYY-MM-DD (IST)
@@ -729,6 +786,7 @@ export interface Weaver {
   shop_id: string;
   name: string;
   phone: string;
+  additional_phones?: string[];
   address: string;
   type: LoomType;
   looms_count: number;

@@ -80,7 +80,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <span className="font-serif-display text-2xl font-bold text-slate-900 block mt-2">
+          <span className="tabular-nums text-2xl font-bold text-slate-900 block mt-2">
             {formatINR(summary.total_taxable_sales, true)}
           </span>
           <span className="text-sm text-slate-500 mt-1 block">Net outward taxable supplies</span>
@@ -93,7 +93,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               <Receipt className="w-4 h-4" />
             </div>
           </div>
-          <span className="font-serif-display text-2xl font-bold text-purple-900 block mt-2">
+          <span className="tabular-nums text-2xl font-bold text-purple-900 block mt-2">
             {formatINR(summary.output_gst, true)}
           </span>
           <span className="text-sm text-purple-700/80 mt-1 block font-medium">GST on sales, after returns</span>
@@ -106,7 +106,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               <FileCheck className="w-4 h-4" />
             </div>
           </div>
-          <span className="font-serif-display text-2xl font-bold text-emerald-700 block mt-2">
+          <span className="tabular-nums text-2xl font-bold text-emerald-700 block mt-2">
             {formatINR(summary.eligible_itc, true)}
           </span>
           <span className="text-sm text-emerald-600/80 mt-1 block font-medium">From registered GSTIN purchases</span>
@@ -119,7 +119,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               <Scale className="w-4 h-4" />
             </div>
           </div>
-          <span className="font-serif-display text-2xl font-bold text-white block mt-2">
+          <span className="tabular-nums text-2xl font-bold text-white block mt-2">
             {formatINR(summary.net_gst_payable, true)}
           </span>
           <span className="text-sm text-purple-200/80 mt-1 block">
@@ -132,7 +132,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="font-serif-display text-sm font-bold text-slate-900">GST Component Reconciliation Matrix</h3>
+            <h3 className="tabular-nums text-sm font-bold text-slate-900">GST Component Reconciliation Matrix</h3>
             <p className="text-sm text-slate-500">Output tax collected vs input credit claimed by statutory component.</p>
           </div>
         </div>
@@ -149,16 +149,55 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50/50">
-                <td className="py-3.5 px-6 font-semibold text-slate-900 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
-                  Output Tax Liability (Sales)
-                </td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_cgst, true)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_sgst, true)}</td>
-                <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_igst, true)}</td>
-                <td className="py-3.5 px-6 text-right font-mono font-bold text-purple-900">{formatINR(totalOutput, true)}</td>
-              </tr>
+              {((tax_breakdown.return_cgst ?? 0) + (tax_breakdown.return_sgst ?? 0) + (tax_breakdown.return_igst ?? 0)) > 0 ? (
+                <>
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="py-3.5 px-6 font-semibold text-slate-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
+                      Output Tax Liability (Gross Sales)
+                    </td>
+                    <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.gross_output_cgst ?? tax_breakdown.output_cgst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.gross_output_sgst ?? tax_breakdown.output_sgst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.gross_output_igst ?? tax_breakdown.output_igst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono font-semibold text-slate-900">
+                      {formatINR((tax_breakdown.gross_output_cgst ?? tax_breakdown.output_cgst) + (tax_breakdown.gross_output_sgst ?? tax_breakdown.output_sgst) + (tax_breakdown.gross_output_igst ?? tax_breakdown.output_igst), true)}
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-slate-50/50 text-amber-900">
+                    <td className="py-3 px-6 font-semibold flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                      Less: GST on Sales Returns / Credit Notes
+                    </td>
+                    <td className="py-3 px-6 text-right font-mono">− {formatINR(tax_breakdown.return_cgst ?? 0, true)}</td>
+                    <td className="py-3 px-6 text-right font-mono">− {formatINR(tax_breakdown.return_sgst ?? 0, true)}</td>
+                    <td className="py-3 px-6 text-right font-mono">− {formatINR(tax_breakdown.return_igst ?? 0, true)}</td>
+                    <td className="py-3 px-6 text-right font-mono font-semibold">
+                      − {formatINR((tax_breakdown.return_cgst ?? 0) + (tax_breakdown.return_sgst ?? 0) + (tax_breakdown.return_igst ?? 0), true)}
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-slate-50/50 bg-purple-50/40">
+                    <td className="py-3.5 px-6 font-semibold text-purple-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-700 inline-block" />
+                      Net Output Tax Liability (After Returns)
+                    </td>
+                    <td className="py-3.5 px-6 text-right font-mono font-semibold text-purple-900">{formatINR(tax_breakdown.output_cgst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono font-semibold text-purple-900">{formatINR(tax_breakdown.output_sgst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono font-semibold text-purple-900">{formatINR(tax_breakdown.output_igst, true)}</td>
+                    <td className="py-3.5 px-6 text-right font-mono font-bold text-purple-900">{formatINR(totalOutput, true)}</td>
+                  </tr>
+                </>
+              ) : (
+                <tr className="hover:bg-slate-50/50">
+                  <td className="py-3.5 px-6 font-semibold text-slate-900 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" />
+                    Output Tax Liability (Sales)
+                  </td>
+                  <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_cgst, true)}</td>
+                  <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_sgst, true)}</td>
+                  <td className="py-3.5 px-6 text-right font-mono text-slate-800">{formatINR(tax_breakdown.output_igst, true)}</td>
+                  <td className="py-3.5 px-6 text-right font-mono font-bold text-purple-900">{formatINR(totalOutput, true)}</td>
+                </tr>
+              )}
               <tr className="hover:bg-slate-50/50">
                 <td className="py-3.5 px-6 font-semibold text-emerald-800 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
@@ -189,7 +228,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 1: Monthly Sales vs Purchases Bar Chart */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Sales vs Purchases (₹)</h4>
+            <h4 className="tabular-nums text-sm font-bold text-slate-900">Monthly Sales vs Purchases (₹)</h4>
             <span className="text-sm text-slate-400"></span>
           </div>
           <div className="h-60 w-full">
@@ -213,7 +252,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 2: Monthly Output GST Trend */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Output GST Liability Trend (₹)</h4>
+            <h4 className="tabular-nums text-sm font-bold text-slate-900">Monthly Output GST Liability Trend (₹)</h4>
             <span className="text-sm text-purple-600 font-medium"></span>
           </div>
           <div className="h-60 w-full">
@@ -241,7 +280,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 3: Monthly Input Tax Credit Trend */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly Input Tax Credit (ITC) Trend (₹)</h4>
+            <h4 className="tabular-nums text-sm font-bold text-slate-900">Monthly Input Tax Credit (ITC) Trend (₹)</h4>
             <span className="text-sm text-emerald-600 font-medium"></span>
           </div>
           <div className="h-60 w-full">
@@ -269,7 +308,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         {/* Chart 4: CGST vs SGST vs IGST Component Comparison */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-serif-display text-sm font-bold text-slate-900">CGST / SGST / IGST Tax Heads Comparison (₹)</h4>
+            <h4 className="tabular-nums text-sm font-bold text-slate-900">CGST / SGST / IGST Tax Heads Comparison (₹)</h4>
             <span className="text-sm text-slate-400"></span>
           </div>
           <div className="h-60 w-full">
@@ -294,7 +333,7 @@ export const GSTDashboardView: React.FC<GSTDashboardViewProps> = ({
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-3 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-serif-display text-sm font-bold text-slate-900">Monthly net GST payable (₹)</h4>
+              <h4 className="tabular-nums text-sm font-bold text-slate-900">Monthly net GST payable (₹)</h4>
               <p className="text-sm text-slate-400">Net tax after offsetting eligible ITC from output sales tax</p>
             </div>
             <span className="text-sm font-mono font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">

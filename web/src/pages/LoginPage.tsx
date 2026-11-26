@@ -71,7 +71,7 @@ export const LoginPage: React.FC = () => {
         <div className="mx-auto w-14 h-14 rounded-2xl bg-brand-900 flex items-center justify-center text-amber-400 shadow-xl shadow-brand-950/20 mb-4">
           <Sparkles className="w-7 h-7" />
         </div>
-        <h2 className="font-serif-display text-3xl font-extrabold text-slate-900 tracking-tight">
+        <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
           YorLedger
         </h2>
         <p className="mt-1 text-sm text-slate-600 font-medium">

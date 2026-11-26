@@ -10,7 +10,7 @@ import {
   signInWithPopup
 } from '../lib/firebase';
 import { getMe, registerShop as registerShopDoc, watchShop, latestVerification as fetchLatestVerification } from '../lib/data/session';
-import { User, Shop, ShopVerification, RegisterShopPayload } from '@yorbalance/shared';
+import { AdminRole, User, Shop, ShopVerification, RegisterShopPayload } from '@yorbalance/shared';
 import { setActiveShop } from '../lib/api';
 
 interface AuthContextType {
@@ -19,6 +19,7 @@ interface AuthContextType {
   latestVerification: ShopVerification | null;
   loading: boolean;
   isAdmin: boolean;
+  adminRole: AdminRole | null;
   isApproved: boolean;
   isPending: boolean;
   isRejected: boolean;
@@ -37,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
   const [latestVerification, setLatestVerification] = useState<ShopVerification | null>(null);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const shopWatch = useRef<(() => void) | null>(null);
 
@@ -51,10 +53,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setShop(null);
     setLatestVerification(null);
+    setAdminRole(null);
   };
 
   const refreshSession = useCallback(async () => {
     try {
+      if (auth.currentUser) {
+        const tok = await auth.currentUser.getIdTokenResult();
+        if (tok.claims.admin === true) {
+          const r = typeof tok.claims.adminRole === 'string' ? (tok.claims.adminRole as AdminRole) : 'super_admin';
+          setAdminRole(r);
+        } else {
+          setAdminRole(null);
+        }
+      } else {
+        setAdminRole(null);
+      }
       const me = await getMe();
       if (!me) {
         // Signed in to Firebase but no shop registered yet (e.g. first Google sign-in).
@@ -164,6 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         latestVerification,
         loading,
         isAdmin: user?.role === 'ADMIN',
+        adminRole,
         isApproved: shop?.status === 'APPROVED',
         isPending: shop?.status === 'PENDING',
         isRejected: shop?.status === 'REJECTED',

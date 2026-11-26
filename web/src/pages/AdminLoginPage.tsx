@@ -44,7 +44,7 @@ export const AdminLoginPage: React.FC = () => {
         <div className="mx-auto w-14 h-14 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-xl mb-4">
           <ShieldCheck className="w-8 h-8" />
         </div>
-        <h2 className="font-serif-display text-3xl font-extrabold tracking-tight">
+        <h2 className="text-3xl font-extrabold tracking-tight">
           YorLedger Admin
         </h2>
         <p className="mt-1 text-sm text-slate-400">

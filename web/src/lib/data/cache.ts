@@ -7,20 +7,19 @@
 import { collection, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import {
   Party, PaymentRecord, ReturnRecord, Transaction, TransactionItem, PaymentStatus,
-  StockMovement, RawMaterial, RawMaterialTx, Weaver, OwnLoomRegister,
+  StockMovement, RawMaterial, RawMaterialTx, Weaver, OwnLoomRegister, LoomType,
   WeaverTransaction, Staff, StaffRecord, PolishingBatch
 } from '@yorbalance/shared';
 import { db } from '../firebase';
 import { toIso, todayIST } from './util';
 
-export interface BillItemDoc { name: string; qty: number; rate: number; line_total: number }
+export interface BillItemDoc { name: string; qty: number; rate: number; line_total: number; hsn_code?: string | null }
 
 type Raw = Record<string, any> & { id: string };
 
 const COLLECTIONS = [
   'parties', 'bills', 'payments', 'returns',
-  'stockMovements', 'rawMaterials', 'rawMaterialTx',
-  'weavers', 'ownLooms', 'weaverTx', 'staff', 'staffRecords', 'polishing'
+  'stockMovements', 'polishing'
 ] as const;
 type Col = typeof COLLECTIONS[number];
 
@@ -28,9 +27,7 @@ class ShopCache {
   private shopId: string | null = null;
   private raw: Record<Col, Map<string, Raw>> = {
     parties: new Map(), bills: new Map(), payments: new Map(), returns: new Map(),
-    stockMovements: new Map(), rawMaterials: new Map(), rawMaterialTx: new Map(),
-    weavers: new Map(), ownLooms: new Map(), weaverTx: new Map(),
-    staff: new Map(), staffRecords: new Map(), polishing: new Map()
+    stockMovements: new Map(), polishing: new Map()
   };
   private loaded = new Set<Col>();
   private unsubs: Unsubscribe[] = [];
@@ -124,13 +121,27 @@ class ShopCache {
       const unsub = this.subscribe(() => { if (ok()) { window.clearTimeout(timer); unsub(); resolve(); } });
     });
   }
-  rawParty(id: string) { return this.raw.parties.get(id); }
+  rawParty(id: string) {
+    return this.raw.parties.get(id);
+  }
   rawBills() { return [...this.raw.bills.values()].filter(b => !b.deleted_at); }
   rawReturns() { return [...this.raw.returns.values()]; }
+  rawStockMovements() { return [...this.raw.stockMovements.values()]; }
+  rawPolishing() { return [...this.raw.polishing.values()]; }
+  rawRawMaterialTx(): Raw[] { return []; }
+  rawWeaverTx(): Raw[] { return []; }
+  rawOwnLoomsDoc(): Raw | null { return null; }
+
+  mapRawBill(b: Raw): Transaction {
+    return this.toTransaction(b, this.payments(), this.returns());
+  }
 
   parties(): Party[] {
     if (this.memo.parties) return this.memo.parties;
-    const out = [...this.raw.parties.values()].filter(p => !p.deleted_at).map(p => this.toParty(p));
+    // Exclude ARTISAN / weaver parties so weavers live ONLY in Stock & Production
+    const out = [...this.raw.parties.values()]
+      .filter(p => !p.deleted_at && p.type !== 'ARTISAN')
+      .map(p => this.toParty(p));
     return (this.memo.parties = out);
   }
 
@@ -142,17 +153,55 @@ class ShopCache {
 
   returns(): ReturnRecord[] {
     if (this.memo.returns) return this.memo.returns;
-    const out = [...this.raw.returns.values()].map(r => ({
-      id: r.id,
-      shop_id: this.shopId!,
-      transaction_id: r.bill_id,
-      party_id: r.party_id,
-      amount_paise: r.total_reduction,
-      amount_rupees: r.total_reduction / 100,
-      reason: r.reason ?? null,
-      return_date: r.returned_on,
-      created_at: toIso(r.created_at) ?? r.returned_on
-    }));
+    const out = [...this.raw.returns.values()].map(r => {
+      const bill = this.raw.bills.get(r.bill_id);
+      const total = Number(r.total_reduction ?? 0);
+      let taxable = r.taxable_reduction !== undefined ? Number(r.taxable_reduction) : undefined;
+      let cgst = r.cgst !== undefined ? Number(r.cgst) : undefined;
+      let sgst = r.sgst !== undefined ? Number(r.sgst) : undefined;
+      let igst = r.igst !== undefined ? Number(r.igst) : undefined;
+
+      if (taxable === undefined && bill && bill.grand_total > 0) {
+        taxable = Math.round((total * (bill.subtotal || 0)) / bill.grand_total);
+        const tax = Math.max(0, total - taxable);
+        if (bill.tax_mode === 'INTER' || (bill.igst ?? 0) > 0) {
+          cgst = 0; sgst = 0; igst = tax;
+        } else {
+          sgst = Math.floor(tax / 2);
+          cgst = tax - sgst;
+          igst = 0;
+        }
+      }
+      const c = cgst ?? 0;
+      const s = sgst ?? 0;
+      const ig = igst ?? 0;
+      const items = Array.isArray(r.items)
+        ? r.items.map((it: any) => ({
+            index: Number(it.index),
+            name: String(it.name ?? bill?.items?.[it.index]?.name ?? ''),
+            qty: Number(it.qty ?? 0),
+            rate_paise: bill?.items?.[it.index]?.rate !== undefined ? Number(bill.items[it.index].rate) : undefined
+          }))
+        : undefined;
+
+      return {
+        id: r.id,
+        shop_id: this.shopId!,
+        transaction_id: r.bill_id,
+        party_id: r.party_id,
+        amount_paise: total,
+        amount_rupees: total / 100,
+        taxable_paise: taxable ?? total,
+        cgst_paise: c,
+        sgst_paise: s,
+        igst_paise: ig,
+        tax_paise: c + s + ig,
+        items,
+        reason: r.reason ?? null,
+        return_date: r.returned_on,
+        created_at: toIso(r.created_at) ?? r.returned_on
+      };
+    });
     return (this.memo.returns = out);
   }
 
@@ -182,147 +231,13 @@ class ShopCache {
     return (this.memo.stockMovements = out);
   }
 
-  rawMaterials(): RawMaterial[] {
-    if (this.memo.rawMaterials) return this.memo.rawMaterials;
-    const out = [...this.raw.rawMaterials.values()].map(r => ({
-      id: r.id,
-      shop_id: this.shopId!,
-      name: r.name,
-      unit: r.unit || 'kg',
-      unit_price_paise: Number(r.unit_price_paise) || 0,
-      low_stock_threshold_kg: r.low_stock_threshold_kg != null ? Number(r.low_stock_threshold_kg) : 5,
-      created_at: toIso(r.created_at) ?? new Date().toISOString(),
-      updated_at: toIso(r.updated_at) ?? undefined
-    }));
-    return (this.memo.rawMaterials = out);
-  }
-
-  rawMaterialTx(): RawMaterialTx[] {
-    if (this.memo.rawMaterialTx) return this.memo.rawMaterialTx;
-    const out = [...this.raw.rawMaterialTx.values()].map(r => {
-      const mat = this.raw.rawMaterials.get(r.material_id);
-      const w = r.weaver_id ? this.raw.weavers.get(r.weaver_id) : null;
-      return {
-        id: r.id,
-        shop_id: this.shopId!,
-        material_id: r.material_id,
-        material_name: r.material_name || (mat?.name ?? 'Material'),
-        tx_type: r.tx_type,
-        qty_kg: Number(r.qty_kg) || 0,
-        rate_per_kg_paise: Number(r.rate_per_kg_paise) || 0,
-        total_amount_paise: Number(r.total_amount_paise) || 0,
-        weaver_id: r.weaver_id ?? null,
-        weaver_name: r.weaver_name ?? (w?.name ?? null),
-        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
-        ref_no: r.ref_no ?? null,
-        notes: r.notes ?? null,
-        created_at: toIso(r.created_at) ?? r.date
-      };
-    });
-    return (this.memo.rawMaterialTx = out);
-  }
-
-  weavers(): Weaver[] {
-    if (this.memo.weavers) return this.memo.weavers;
-    const out = [...this.raw.weavers.values()].map(r => ({
-      id: r.id,
-      shop_id: this.shopId!,
-      name: r.name,
-      phone: r.phone || '',
-      address: r.address || '',
-      type: r.type || 'HANDLOOM',
-      looms_count: Number(r.looms_count) || 1,
-      notes: r.notes ?? null,
-      created_at: toIso(r.created_at) ?? new Date().toISOString(),
-      updated_at: toIso(r.updated_at) ?? undefined
-    }));
-    return (this.memo.weavers = out);
-  }
-
-  ownLooms(): OwnLoomRegister | null {
-    if (this.memo.ownLooms !== undefined) return this.memo.ownLooms;
-    const raw = [...this.raw.ownLooms.values()][0];
-    if (!raw) return (this.memo.ownLooms = null);
-    const out: OwnLoomRegister = {
-      id: raw.id,
-      shop_id: this.shopId!,
-      handloom_running: Number(raw.handloom_running) || 0,
-      handloom_idle: Number(raw.handloom_idle) || 0,
-      handloom_repair: Number(raw.handloom_repair) || 0,
-      powerloom_running: Number(raw.powerloom_running) || 0,
-      powerloom_idle: Number(raw.powerloom_idle) || 0,
-      powerloom_repair: Number(raw.powerloom_repair) || 0,
-      updated_at: toIso(raw.updated_at) ?? new Date().toISOString()
-    };
-    return (this.memo.ownLooms = out);
-  }
-
-  weaverTx(): WeaverTransaction[] {
-    if (this.memo.weaverTx) return this.memo.weaverTx;
-    const out = [...this.raw.weaverTx.values()].map(r => {
-      const w = this.raw.weavers.get(r.weaver_id);
-      return {
-        id: r.id,
-        shop_id: this.shopId!,
-        weaver_id: r.weaver_id,
-        weaver_name: r.weaver_name ?? (w?.name ?? 'Weaver'),
-        action_type: r.action_type,
-        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
-        material_id: r.material_id ?? null,
-        material_name: r.material_name ?? null,
-        qty_kg: r.qty_kg != null ? Number(r.qty_kg) : undefined,
-        unit_price_paise: r.unit_price_paise != null ? Number(r.unit_price_paise) : undefined,
-        total_material_paise: r.total_material_paise != null ? Number(r.total_material_paise) : undefined,
-        finished_item_name: r.finished_item_name,
-        sarees_count: r.sarees_count != null ? Number(r.sarees_count) : undefined,
-        wastage_kg: r.wastage_kg != null ? Number(r.wastage_kg) : undefined,
-        wage_amount_paise: r.wage_amount_paise != null ? Number(r.wage_amount_paise) : undefined,
-        payment_amount_paise: r.payment_amount_paise != null ? Number(r.payment_amount_paise) : undefined,
-        payment_mode: r.payment_mode,
-        notes: r.notes ?? null,
-        created_at: toIso(r.created_at) ?? r.date
-      };
-    });
-    return (this.memo.weaverTx = out);
-  }
-
-  staff(): Staff[] {
-    if (this.memo.staff) return this.memo.staff;
-    const out = [...this.raw.staff.values()].map(r => ({
-      id: r.id,
-      shop_id: this.shopId!,
-      name: r.name,
-      role: r.role || 'Staff',
-      phone: r.phone || '',
-      wage_type: r.wage_type || 'MONTHLY',
-      wage_amount_paise: Number(r.wage_amount_paise) || 0,
-      joining_date: r.joining_date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
-      status: r.status || 'ACTIVE',
-      created_at: toIso(r.created_at) ?? new Date().toISOString(),
-      updated_at: toIso(r.updated_at) ?? undefined
-    }));
-    return (this.memo.staff = out);
-  }
-
-  staffRecords(): StaffRecord[] {
-    if (this.memo.staffRecords) return this.memo.staffRecords;
-    const out = [...this.raw.staffRecords.values()].map(r => {
-      const s = this.raw.staff.get(r.staff_id);
-      return {
-        id: r.id,
-        shop_id: this.shopId!,
-        staff_id: r.staff_id,
-        staff_name: r.staff_name ?? (s?.name ?? 'Staff'),
-        record_type: r.record_type,
-        date: r.date || (toIso(r.created_at)?.slice(0, 10) ?? todayIST()),
-        attendance_status: r.attendance_status,
-        amount_paise: r.amount_paise != null ? Number(r.amount_paise) : undefined,
-        notes: r.notes ?? null,
-        created_at: toIso(r.created_at) ?? r.date
-      };
-    });
-    return (this.memo.staffRecords = out);
-  }
+  rawMaterials(): RawMaterial[] { return []; }
+  rawMaterialTx(): RawMaterialTx[] { return []; }
+  weavers(): Weaver[] { return []; }
+  ownLooms(): OwnLoomRegister | null { return null; }
+  weaverTx(): WeaverTransaction[] { return []; }
+  staff(): Staff[] { return []; }
+  staffRecords(): StaffRecord[] { return []; }
 
   polishing(): PolishingBatch[] {
     if (this.memo.polishing) return this.memo.polishing;
@@ -360,6 +275,8 @@ class ShopCache {
       state_code: p.state_code ?? '',
       pin_code: p.pin_code ?? '',
       notes: p.notes ?? null,
+      loom_type: p.loom_type ?? (p.type === 'ARTISAN' ? 'HANDLOOM' : undefined),
+      looms_count: p.looms_count != null ? Number(p.looms_count) : (p.type === 'ARTISAN' ? 1 : undefined),
       joined_on: p.joined_on ?? (toIso(p.created_at) ?? '').slice(0, 10),
       created_at: toIso(p.created_at) ?? p.joined_on ?? new Date().toISOString(),
       updated_at: toIso(p.updated_at) ?? undefined
@@ -396,6 +313,7 @@ class ShopCache {
 
   private toTransaction(b: Raw, pays: PaymentRecord[], rets: ReturnRecord[]): Transaction {
     const party = this.raw.parties.get(b.party_id);
+    const legacyHsn = b.kind !== 'JOB_WORK' ? (b.hsn_code ?? null) : null;
     const items: TransactionItem[] = (b.items as BillItemDoc[]).map((it, i) => ({
       id: `${b.id}-${i}`,
       transaction_id: b.id,
@@ -403,18 +321,23 @@ class ShopCache {
       quantity: it.qty,
       rate_paise: it.rate,
       gst_rate_bp: b.gst_bp,
-      amount_paise: it.line_total
+      amount_paise: it.line_total,
+      hsn_code: b.kind === 'JOB_WORK' ? null : (it.hsn_code ?? legacyHsn)
     }));
     const due: number = b.amount_due;
     let status: PaymentStatus = 'PENDING';
     if (due <= 0) status = 'SETTLED';
     else if (b.paid_total > 0 || b.returned_total > 0) status = 'PARTIAL';
+    const partyPhone = b.party_phone ?? b.customer_phone ?? party?.phone ?? null;
     return {
       id: b.id,
       shop_id: this.shopId!,
       party_id: b.party_id,
-      party_name: party?.name ?? b.party_name ?? 'Party',
-      party_type: party?.type ?? b.party_type,
+      party_name: party?.name ?? b.party_name ?? b.customer_name ?? 'Party',
+      party_phone: partyPhone,
+      customer_name: b.customer_name ?? (b.kind === 'JOB_WORK' ? b.party_name : null),
+      customer_phone: partyPhone,
+      party_type: party?.type ?? b.party_type ?? 'CUSTOMER',
       type: b.kind,
       invoice_number: b.invoice_prefix ? `${b.invoice_prefix}${b.invoice_no}` : String(b.invoice_no),
       invoice_prefix: b.invoice_prefix ?? null,
@@ -430,7 +353,7 @@ class ShopCache {
       return_paise: b.returned_total,
       pending_paise: Math.max(0, due),
       status,
-      hsn_code: b.hsn_code ?? null,
+      hsn_code: null,
       items,
       payments: pays.filter(p => p.transaction_id === b.id),
       returns: rets.filter(r => r.transaction_id === b.id),

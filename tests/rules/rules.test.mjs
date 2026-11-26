@@ -222,3 +222,38 @@ test('audit rows are append-only and carry the real actor', async () => {
   await assertFails(db.doc('shops/sA/audit/a1').update({ action: 'X' }));
   await assertFails(db.doc('shops/sA/audit/a1').delete());
 });
+
+// ---------------- admin RBAC & data isolation ----------------
+
+test('normal users cannot read or write admin collections; admins cannot read shop bills directly', async () => {
+  await env.withSecurityRulesDisabled(async ctx => {
+    const db = ctx.firestore();
+    await db.doc('adminStats/latest').set({ total_documents: 10 });
+    await db.doc('adminHealth/current').set({ overall: 'OK' });
+    await db.doc('adminAudit/a1').set({ action: 'TEST' });
+    await db.doc('adminSettings/limits').set({ daily_reads_limit: 50000 });
+  });
+
+  // Normal user A is blocked from all admin collections
+  const ownerDb = as(A);
+  await assertFails(ownerDb.doc('adminStats/latest').get());
+  await assertFails(ownerDb.doc('adminHealth/current').get());
+  await assertFails(ownerDb.doc('adminAudit/a1').get());
+  await assertFails(ownerDb.doc('adminSettings/limits').get());
+  await assertFails(ownerDb.doc('adminStats/latest').set({ total_documents: 999 }));
+
+  // Admin can read aggregated adminStats/adminHealth/adminAudit, but viewer CANNOT write them
+  const adminDb = as(ADMIN, { admin: true, adminRole: 'super_admin' });
+  await assertSucceeds(adminDb.doc('adminStats/latest').get());
+  await assertSucceeds(adminDb.doc('adminHealth/current').get());
+  await assertSucceeds(adminDb.doc('adminAudit/a1').get());
+  const viewerDb = as('viewer-1', { admin: true, adminRole: 'viewer' });
+  await assertFails(viewerDb.doc('adminStats/latest').set({ total_documents: 0 }));
+
+  // Admin CANNOT read shop financial collections (bills, parties) directly
+  await assertFails(adminDb.doc('shops/sA/bills/b1').get());
+  await assertFails(adminDb.collection('shops/sA/parties').get());
+
+  // Viewer admin cannot approve or reject shops
+  await assertFails(viewerDb.doc('shops/sP').update({ status: 'APPROVED', verified_by: 'v', verified_at: now, updated_at: now }));
+});

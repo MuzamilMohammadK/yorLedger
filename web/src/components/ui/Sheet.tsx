@@ -2,12 +2,58 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 /** Bottom sheet on phones, centred dialog on desktop. Escape closes it. */
-export const Sheet: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }> = ({ title, onClose, children, wide }) => {
+export const Sheet: React.FC<{
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  wide?: boolean;
+  size?: 'default' | 'wide' | 'bill';
+}> = ({ title, onClose, children, wide, size }) => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  if (size === 'bill') {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className="jw-dialog bg-white rounded-3xl shadow-2xl overflow-hidden box-border"
+          style={{
+            width: 'min(760px, calc(100vw - 32px))',
+            maxHeight: 'calc(100dvh - 32px)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          <div className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-slate-900 truncate">{title}</h2>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="w-12 h-12 shrink-0 rounded-full hover:bg-slate-100 flex items-center justify-center"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div
+            className="jw-body overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0"
+            style={{
+              padding: '24px',
+              containerType: 'inline-size'
+            }}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-end sm:items-center justify-center">
       <div role="dialog" aria-modal="true" aria-label={title}

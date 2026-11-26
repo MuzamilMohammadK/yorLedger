@@ -6,8 +6,9 @@
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
-.font-serif-display {
-  font-family: 'Playfair Display', Georgia, serif;
+.tx-num,
+.tabular-nums {
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 
@@ -57,3 +58,169 @@ html.dark [class*="shadow"] { box-shadow: none; }
 @media print {
   html.dark body, html.dark .bg-white, html.dark .bg-slate-50 { background: #fff !important; color: #000 !important; }
 }
+
+/* ------------------------------------------------------------------
+   Job Work Dialog & Responsive Item Grid
+   ------------------------------------------------------------------ */
+.jw-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.jw-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+  container-type: inline-size;
+  box-sizing: border-box;
+}
+
+/* Default / Wide layout (container > 620px) */
+.jw-head {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 76px 112px 112px 36px;
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.jw-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 76px 112px 112px 36px;
+  gap: 8px;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+.jw-col-name { grid-area: auto; min-width: 0; box-sizing: border-box; }
+.jw-col-qty { grid-area: auto; min-width: 0; box-sizing: border-box; }
+.jw-col-rate { grid-area: auto; min-width: 0; box-sizing: border-box; }
+.jw-col-amount { grid-area: auto; min-width: 0; box-sizing: border-box; }
+.jw-col-remove { grid-area: auto; min-width: 0; box-sizing: border-box; }
+.jw-field-label { display: none; }
+.jw-row-num { display: block; }
+
+@container (min-width: 621px) {
+  .jw-col-name {
+    min-width: 200px;
+  }
+}
+
+/* Narrow layout (container <= 620px) */
+@container (max-width: 620px) {
+  .jw-head {
+    display: none !important;
+  }
+  .jw-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-areas:
+      "name name remove"
+      "qty rate amount" !important;
+    gap: 10px !important;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: #ffffff;
+  }
+  .jw-row-num {
+    display: none !important;
+  }
+  .jw-field-label {
+    display: block !important;
+  }
+  .jw-col-name {
+    grid-area: name !important;
+    min-width: 0 !important;
+  }
+  .jw-col-remove {
+    grid-area: remove !important;
+    justify-self: end !important;
+  }
+  .jw-col-qty {
+    grid-area: qty !important;
+    min-width: 0 !important;
+  }
+  .jw-col-rate {
+    grid-area: rate !important;
+    min-width: 0 !important;
+  }
+  .jw-col-amount {
+    grid-area: amount !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Container-Query Responsive Tables (Parties, Stock) & Numeric Helpers
+   ------------------------------------------------------------------ */
+.parties-table-wrap,
+.stock-table-wrap {
+  container-type: inline-size;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tx-num {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Parties responsive table */
+.parties-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 84px minmax(0, 0.9fr) 110px 140px minmax(0, 0.8fr) minmax(165px, 195px) 100px;
+  align-items: center;
+  box-sizing: border-box;
+}
+.parties-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 84px minmax(0, 0.9fr) 110px 140px minmax(0, 0.8fr) minmax(165px, 195px) 100px;
+  align-items: center;
+  box-sizing: border-box;
+}
+.parties-head > div,
+.parties-row > div {
+  padding: 12px 12px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.parties-mobile-card { display: none; }
+
+@container (max-width: 860px) {
+  .parties-head { display: none !important; }
+  .parties-desktop-only { display: none !important; }
+  .parties-mobile-card { display: block !important; }
+}
+
+/* Stock Tally responsive table */
+.stock-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(8, minmax(56px, 0.6fr)) 76px;
+  align-items: center;
+  box-sizing: border-box;
+}
+.stock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(8, minmax(56px, 0.6fr)) 76px;
+  align-items: center;
+  box-sizing: border-box;
+}
+.stock-head > div,
+.stock-row > div {
+  padding: 12px 10px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.stock-mobile-card { display: none; }
+
+@container (max-width: 860px) {
+  .stock-head { display: none !important; }
+  .stock-desktop-only { display: none !important; }
+  .stock-mobile-card { display: block !important; }
+}
+
+

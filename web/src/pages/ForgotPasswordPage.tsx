@@ -41,7 +41,7 @@ export const ForgotPasswordPage: React.FC = () => {
         <div className="mx-auto w-12 h-12 rounded-2xl bg-brand-900 flex items-center justify-center text-amber-400 shadow-xl shadow-brand-950/20 mb-3">
           <Sparkles className="w-6 h-6" />
         </div>
-        <h2 className="font-serif-display text-2xl font-bold text-slate-900">
+        <h2 className="text-2xl font-bold text-slate-900">
           Reset Your Password
         </h2>
         <p className="mt-1 text-sm text-slate-600">

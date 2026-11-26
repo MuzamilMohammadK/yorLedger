@@ -1,6 +1,8 @@
 import React from 'react';
 import { PurchaseLedgerReport, formatINR } from '@yorbalance/shared';
 import { ShoppingBag, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { useI18n } from '../../i18n';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface PurchaseLedgerTableProps {
   report: PurchaseLedgerReport | null;
@@ -8,6 +10,7 @@ interface PurchaseLedgerTableProps {
 }
 
 export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report, loading = false }) => {
+  const { fmtDate } = useI18n();
   if (loading) {
     return (
       <div className="bg-white rounded-3xl p-6 border border-slate-200 animate-pulse space-y-4">
@@ -23,7 +26,7 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
         <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
           <ShoppingBag className="w-6 h-6" />
         </div>
-        <h3 className="font-serif-display text-base font-bold text-slate-800">No Purchase Bills Recorded</h3>
+        <h3 className="tabular-nums text-base font-bold text-slate-800">No Purchase Bills Recorded</h3>
         <p className="text-sm text-slate-500 max-w-sm mx-auto">
           There are no purchase transactions matching the selected date range or filter criteria.
         </p>
@@ -39,7 +42,7 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Purchases</span>
-          <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-slate-900 block mt-0.5">
             {formatINR(totals.total_purchase_value, true)}
           </span>
           <span className="text-sm text-slate-500">{items.length} Bills</span>
@@ -47,7 +50,7 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Taxable Base</span>
-          <span className="font-serif-display text-base font-bold text-slate-800 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-slate-800 block mt-0.5">
             {formatINR(totals.total_taxable_value, true)}
           </span>
           <span className="text-sm text-slate-500">Net Base</span>
@@ -89,7 +92,7 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
           <span className="text-sm font-bold uppercase tracking-wider text-emerald-800 block flex items-center gap-1">
             <ShieldCheck className="w-3 h-3 text-emerald-600" /> Eligible ITC
           </span>
-          <span className="font-serif-display text-base font-bold text-emerald-700 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-emerald-700 block mt-0.5">
             {formatINR(totals.eligible_itc, true)}
           </span>
           <span className="text-sm text-emerald-600/90 font-medium">Claimable in 3B</span>
@@ -100,7 +103,7 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
       <div className="hidden md:block bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="font-serif-display text-sm font-bold text-slate-900">Purchase Invoices & Input Tax Register</h3>
+            <h3 className="tabular-nums text-sm font-bold text-slate-900">Purchase Invoices & Input Tax Register</h3>
             <p className="text-sm text-slate-500">Itemized supplier bills, tax heads, returns adjustment and claimable ITC.</p>
           </div>
           <span className="text-sm font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
@@ -131,8 +134,8 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
                     <span className="font-semibold text-slate-900 block font-mono">
                       {item.invoice_number || 'N/A'}
                     </span>
-                    <span className="text-sm text-slate-400">
-                      {new Date(item.bill_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <span className="text-sm text-slate-400 tabular-nums">
+                      {fmtDate(item.bill_date)}
                     </span>
                   </td>
                   <td className="py-3 px-4 max-w-[200px]">
@@ -164,26 +167,19 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
                   <td className="py-3 px-4 text-right font-semibold font-mono text-slate-900">
                     {formatINR(item.net_purchase_amount, true)}
                   </td>
-                  <td className="py-3 px-4 text-right font-mono text-rose-600">
-                    {item.returns > 0 ? `-${formatINR(item.returns, true)}` : '—'}
+                  <td className="py-3 px-4 text-right font-mono text-rose-600 tabular-nums">
+                    {item.returns > 0 ? (
+                      <div>
+                        <span>−{formatINR(item.returns, true)}</span>
+                        <span className="block text-[11px] font-normal text-slate-500">incl. GST</span>
+                      </div>
+                    ) : '—'}
                   </td>
-                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">
+                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700 tabular-nums">
                     {formatINR(item.eligible_itc, true)}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                        item.payment_status === 'SETTLED'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : item.payment_status === 'PARTIAL'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : item.payment_status === 'OVERDUE'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {item.payment_status}
-                    </span>
+                    <StatusBadge status={item.payment_status} />
                   </td>
                 </tr>
               ))}
@@ -213,23 +209,11 @@ export const PurchaseLedgerTable: React.FC<PurchaseLedgerTableProps> = ({ report
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="font-mono font-bold text-sm text-slate-900 block">{item.invoice_number || 'N/A'}</span>
-                <span className="text-sm text-slate-400">
-                  {new Date(item.bill_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                <span className="text-sm text-slate-400 tabular-nums">
+                  {fmtDate(item.bill_date)}
                 </span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                  item.payment_status === 'SETTLED'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : item.payment_status === 'PARTIAL'
-                    ? 'bg-amber-50 text-amber-700'
-                    : item.payment_status === 'OVERDUE'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
-              >
-                {item.payment_status}
-              </span>
+              <StatusBadge status={item.payment_status} />
             </div>
 
             <div className="pt-1 border-t border-slate-100">

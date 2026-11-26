@@ -79,3 +79,19 @@ test('final return clears exactly what remains (no stray paise)', () => {
   const b = computeReturn({ ...bill, returnedTotal: a.totalReduction, returnedQty: a.newReturnedQty }, [{ index: 0, qty: 2 }]);
   assert.strictEqual(a.totalReduction + b.totalReduction, 1049);
 });
+
+test('partial IGST returns: 20 of 100 sarees at ₹2,000 + 5% IGST, then 10 more', () => {
+  const bill = { items: [{ qty: 100, rate: 200000 }], gstBp: 500, taxMode: 'INTER' as const,
+                 grandTotal: 21000000, returnedTotal: 0, returnedQty: {} };
+  const r1 = computeReturn(bill, [{ index: 0, qty: 20 }]);
+  assert.strictEqual(r1.taxableReduction, 4000000);
+  assert.strictEqual(r1.igst, 200000);
+  assert.strictEqual(r1.cgst, 0);
+  assert.strictEqual(r1.sgst, 0);
+  assert.strictEqual(r1.totalReduction, 4200000);
+
+  const r2 = computeReturn({ ...bill, returnedTotal: r1.totalReduction, returnedQty: r1.newReturnedQty }, [{ index: 0, qty: 10 }]);
+  assert.strictEqual(r2.taxableReduction, 2000000);
+  assert.strictEqual(r2.igst, 100000);
+  assert.strictEqual(r2.totalReduction, 2100000);
+});

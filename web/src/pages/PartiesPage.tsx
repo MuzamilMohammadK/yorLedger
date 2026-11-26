@@ -11,7 +11,7 @@ import { JoinDateCalendar } from '../components/parties/JoinDateCalendar';
 import { TransactionsTable } from '../components/simple/TransactionsTable';
 import { Sheet } from '../components/ledger/NewTransactionModal';
 
-const FILTERS = ['ALL', 'CUSTOMER', 'SUPPLIER', 'ARTISAN'] as const;
+const FILTERS = ['ALL', 'CUSTOMER', 'SUPPLIER'] as const;
 
 /** §7 Parties: list, search, type filter, join-date calendar, details and actions. */
 export const PartiesPage: React.FC = () => {
@@ -34,15 +34,21 @@ export const PartiesPage: React.FC = () => {
   const { data: bills } = useLive(() => api.getAllBills(), []);
   const parties = partyData?.parties ?? [];
 
-  // Exact position per party in paise: + they owe us, − we owe them; credit = overpaid after returns (§10.4).
+  // Exact position per party in paise: net receivable/payable per direction after offsetting unused return/advance credit.
   const pos = useMemo(() => {
-    const m = new Map<string, { balance: number; credit: number }>();
+    const raw = new Map<string, { saleNet: number; purNet: number }>();
     for (const b of bills ?? []) {
-      const cur = m.get(b.party_id) ?? { balance: 0, credit: 0 };
+      const cur = raw.get(b.party_id) ?? { saleNet: 0, purNet: 0 };
       const due = b.grand_total_paise - (b.return_paise ?? 0) - b.paid_paise;
-      if (due > 0) cur.balance += b.type === 'SALE' ? due : -due;
-      else if (due < 0) cur.credit += -due;
-      m.set(b.party_id, cur);
+      if (b.type === 'SALE') cur.saleNet += due;
+      else cur.purNet += due;
+      raw.set(b.party_id, cur);
+    }
+    const m = new Map<string, { balance: number; credit: number }>();
+    for (const [pid, { saleNet, purNet }] of raw.entries()) {
+      const balance = Math.max(0, saleNet) - Math.max(0, purNet);
+      const credit = Math.max(0, -saleNet) + Math.max(0, -purNet);
+      m.set(pid, { balance, credit });
     }
     return m;
   }, [bills]);
@@ -78,11 +84,18 @@ export const PartiesPage: React.FC = () => {
   const balance = (p: Party) => {
     const v = pos.get(p.id) ?? { balance: 0, credit: 0 };
     return (
-      <span className="block">
-        {v.balance > 0 && <span className="block text-base font-bold text-emerald-700">{t('will_get')} {rs(v.balance)}</span>}
-        {v.balance < 0 && <span className="block text-base font-bold text-rose-700">{t('will_give')} {rs(-v.balance)}</span>}
+      <span className="block whitespace-nowrap tabular-nums">
+        {v.balance > 0 && <span className="block text-sm font-bold text-emerald-700">{t('will_get')} {rs(v.balance)}</span>}
+        {v.balance < 0 && <span className="block text-sm font-bold text-rose-700">{t('will_give')} {rs(-v.balance)}</span>}
         {v.balance === 0 && !v.credit && <span className="block text-sm text-slate-500">{t('settled')}</span>}
-        {v.credit > 0 && <span className="block text-sm font-semibold text-indigo-700">{t('credit_amount', { amount: rs(v.credit) })}</span>}
+        {v.credit > 0 && (
+          <span
+            title="Credit = advance or unused return amount"
+            className="block text-xs font-semibold text-indigo-700 cursor-help mt-0.5"
+          >
+            {t('credit_amount', { amount: rs(v.credit) })}
+          </span>
+        )}
       </span>
     );
   };
@@ -100,35 +113,37 @@ export const PartiesPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">{t('nav_parties')}</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setShowCal(!showCal)} aria-pressed={showCal} aria-label={t('join_calendar')}
-            className={`h-12 px-3 rounded-xl border-2 text-base font-semibold flex items-center gap-2 ${showCal ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white'}`}>
-            <CalendarDays className="w-5 h-5" /> <span className="hidden sm:inline">{t('join_calendar')}</span>
-          </button>
-          <button onClick={() => setParams({ new: '1' })} className="h-12 px-4 rounded-xl bg-indigo-700 text-white text-base font-bold flex items-center gap-2">
-            <UserPlus className="w-5 h-5" /> {t('add_party')}
-          </button>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold text-slate-900">{t('nav_parties')}</h1>
+          <div className="flex gap-2">
+            <button onClick={() => setShowCal(!showCal)} aria-pressed={showCal} aria-label={t('join_calendar')}
+              className={`h-11 px-3 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 ${showCal ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white'}`}>
+              <CalendarDays className="w-5 h-5" /> <span className="hidden sm:inline">{t('join_calendar')}</span>
+            </button>
+            <button onClick={() => setParams({ new: '1' })} className="h-11 px-4 rounded-xl bg-indigo-700 text-white text-sm font-bold flex items-center gap-2">
+              <UserPlus className="w-5 h-5" /> {t('add_party')}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {(showCal || day) && <JoinDateCalendar counts={joinCounts} selected={day} onSelect={setDay} />}
-      {day && <p className="text-base font-semibold text-indigo-800">{t('parties_on', { date: fmtDate(day) })}</p>}
+        {(showCal || day) && <JoinDateCalendar counts={joinCounts} selected={day} onSelect={setDay} />}
+        {day && <p className="text-sm font-semibold text-indigo-800">{t('parties_on', { date: fmtDate(day) })}</p>}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`h-11 px-4 shrink-0 rounded-full text-base font-semibold ${filter === f ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
-            {t(`types_${f}` as any)}
-          </button>
-        ))}
-      </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          {FILTERS.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`h-10 px-4 shrink-0 rounded-full text-sm font-semibold ${filter === f ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+              {t(`types_${f}` as any)}
+            </button>
+          ))}
+        </div>
 
-      <div className="relative">
-        <Search className="w-5 h-5 absolute left-3 top-3.5 text-slate-400" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('search_party')}
-          className="w-full h-12 pl-10 pr-3 rounded-xl border-2 border-slate-200 bg-white text-base focus:border-indigo-600 focus:outline-none" />
+        <div className="relative">
+          <Search className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('search_party')}
+            className="w-full h-11 pl-10 pr-3 rounded-xl border-2 border-slate-200 bg-white text-base focus:border-indigo-600 focus:outline-none" />
+        </div>
       </div>
 
       {partyData === null && <p className="py-8 text-center text-base text-slate-500">{t('loading')}</p>}
@@ -136,53 +151,55 @@ export const PartiesPage: React.FC = () => {
         <p className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">{t('no_parties')}</p>
       )}
 
-      {/* Phones: cards */}
-      <div className="md:hidden space-y-2">
-        {list.map(p => (
-          <div key={p.id} className="p-3 rounded-2xl bg-white border border-slate-200">
-            <button onClick={() => openParty(p)} className="w-full text-left">
-              <p className="text-lg font-bold text-slate-900">{p.name}</p>
-              <p className="text-sm text-slate-600">{t(`type_${p.type}` as any)} · {p.owner_name} · {p.phone}</p>
-              <p className="text-sm text-slate-500">
-                {p.gstin ? <span className="font-mono">{p.gstin}</span> : '—'} · {getStateByCode(p.state_code)?.name ?? p.state ?? '—'} · {t('joined_date')} {fmtDate(p.joined_on)}
-              </p>
-              {balance(p)}
-            </button>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <a href={`tel:${p.phone}`} className="h-12 rounded-xl border-2 border-slate-200 text-base font-semibold text-slate-700 flex items-center justify-center gap-1"><Phone className="w-5 h-5" /> {t('call')}</a>
-              <a href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer" className="h-12 rounded-xl bg-[#25D366] text-white text-base font-semibold flex items-center justify-center gap-1"><MessageCircle className="w-5 h-5" /> {t('whatsapp')}</a>
-              <button onClick={() => shell.openNewBill({ partyId: p.id })} className="h-12 rounded-xl bg-indigo-700 text-white text-base font-semibold flex items-center justify-center gap-1"><Plus className="w-5 h-5" /> {t('new_bill')}</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Desktop: table */}
+      {/* Container-query responsive list / table (scrolls inside its own area) */}
       {!!list.length && (
-        <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                {[t('business_name'), t('col_type'), t('owner_name'), t('mobile'), t('gstin'), t('state'), t('outstanding'), t('joined_date')].map(h => (
-                  <th key={h} className="px-3 py-3 text-left text-sm font-semibold text-slate-600 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {list.map(p => (
-                <tr key={p.id} onClick={() => openParty(p)} className="hover:bg-slate-50 cursor-pointer">
-                  <td className="px-3 py-3 text-base font-semibold">{p.name}</td>
-                  <td className="px-3 py-3 text-base">{t(`type_${p.type}` as any)}</td>
-                  <td className="px-3 py-3 text-base">{p.owner_name}</td>
-                  <td className="px-3 py-3 text-base whitespace-nowrap">{p.phone}</td>
-                  <td className="px-3 py-3 text-base font-mono whitespace-nowrap">{p.gstin ?? '—'}</td>
-                  <td className="px-3 py-3 text-base">{getStateByCode(p.state_code)?.name ?? p.state ?? '—'}</td>
-                  <td className="px-3 py-3">{balance(p)}</td>
-                  <td className="px-3 py-3 text-base whitespace-nowrap">{fmtDate(p.joined_on)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="parties-table-wrap rounded-2xl border border-slate-200 bg-white divide-y divide-slate-100">
+          <div className="parties-head bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-600">
+            <div>{t('business_name')}</div>
+            <div>{t('col_type')}</div>
+            <div>{t('owner_name')}</div>
+            <div>{t('mobile')}</div>
+            <div>{t('gstin')}</div>
+            <div>{t('state')}</div>
+            <div>{t('outstanding')}</div>
+            <div>{t('joined_date')}</div>
+          </div>
+
+          {list.map(p => (
+            <div key={p.id} className="min-w-0">
+              {/* Desktop Row (>= 860px) */}
+              <div onClick={() => openParty(p)} className="parties-desktop-only parties-row hover:bg-slate-50 cursor-pointer text-[14px]">
+                <div className="font-bold text-slate-900 line-clamp-2 break-words">{p.name}</div>
+                <div className="text-slate-700">{t(`type_${p.type}` as any)}</div>
+                <div className="text-slate-700 truncate">{p.owner_name}</div>
+                <div className="tx-num text-slate-700">{p.phone}</div>
+                <div className="font-mono text-xs text-slate-700 truncate">{p.gstin ?? '—'}</div>
+                <div className="text-slate-700 truncate">{getStateByCode(p.state_code)?.name ?? p.state ?? '—'}</div>
+                <div className="min-w-[165px] whitespace-nowrap">{balance(p)}</div>
+                <div className="tx-num text-slate-600">{fmtDate(p.joined_on)}</div>
+              </div>
+
+              {/* Narrow Card (< 860px) */}
+              <div className="parties-mobile-card p-3.5 space-y-2">
+                <button onClick={() => openParty(p)} className="w-full text-left space-y-1">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <p className="text-[15px] font-bold text-slate-900 line-clamp-2 break-words min-w-0">{p.name}</p>
+                    <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">{t(`type_${p.type}` as any)}</span>
+                  </div>
+                  <p className="text-xs text-slate-600">{p.owner_name} · <span className="tx-num">{p.phone}</span></p>
+                  <p className="text-xs text-slate-500">
+                    {p.gstin ? <span className="font-mono">{p.gstin}</span> : '—'} · {getStateByCode(p.state_code)?.name ?? p.state ?? '—'} · {t('joined_date')} {fmtDate(p.joined_on)}
+                  </p>
+                  {balance(p)}
+                </button>
+                <div className="pt-1 grid grid-cols-3 gap-2">
+                  <a href={`tel:${p.phone}`} className="h-10 rounded-xl border-2 border-slate-200 text-sm font-semibold text-slate-700 flex items-center justify-center gap-1"><Phone className="w-4 h-4" /> {t('call')}</a>
+                  <a href={`https://wa.me/91${p.phone}`} target="_blank" rel="noopener noreferrer" className="h-10 rounded-xl bg-[#25D366] text-white text-sm font-semibold flex items-center justify-center gap-1"><MessageCircle className="w-4 h-4" /> {t('whatsapp')}</a>
+                  <button onClick={() => shell.openNewBill({ partyId: p.id })} className="h-10 rounded-xl bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-1"><Plus className="w-4 h-4" /> {t('new_bill')}</button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -222,7 +239,12 @@ export const PartiesPage: React.FC = () => {
         </Sheet>
       )}
 
-      <PartyFormModal isOpen={formOpen} onClose={closeForm} onSuccess={p => { if (!editing) { justOpened.current = true; openParty(p); } }} initialParty={editing} />
+      <PartyFormModal
+        isOpen={formOpen}
+        onClose={closeForm}
+        initialParty={editing}
+        onSuccess={p => { if (!editing) { justOpened.current = true; openParty(p); } }}
+      />
     </div>
   );
 };

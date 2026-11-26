@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { SalesLedgerReport, formatINR } from '@yorbalance/shared';
 import { TrendingUp, MapPin, Globe } from 'lucide-react';
+import { useI18n } from '../../i18n';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface SalesLedgerTableProps {
   report: SalesLedgerReport | null;
@@ -8,6 +10,7 @@ interface SalesLedgerTableProps {
 }
 
 export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, loading = false }) => {
+  const { fmtDate } = useI18n();
   const [activeTab, setActiveTab] = useState<'ALL' | 'INTRA_STATE' | 'INTER_STATE'>('ALL');
 
   if (loading) {
@@ -25,7 +28,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
         <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
           <TrendingUp className="w-6 h-6" />
         </div>
-        <h3 className="font-serif-display text-base font-bold text-slate-800">No Sales Bills Recorded</h3>
+        <h3 className="tabular-nums text-base font-bold text-slate-800">No Sales Bills Recorded</h3>
         <p className="text-sm text-slate-500 max-w-sm mx-auto">
           There are no sales transactions matching the selected filters or time period.
         </p>
@@ -50,7 +53,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Sales</span>
-          <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-slate-900 block mt-0.5">
             {formatINR(totals.total_sales_value, true)}
           </span>
           <span className="text-sm text-slate-500">{items.length} Invoices</span>
@@ -58,7 +61,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Taxable Base</span>
-          <span className="font-serif-display text-base font-bold text-slate-800 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-slate-800 block mt-0.5">
             {formatINR(totals.total_taxable_sales, true)}
           </span>
           <span className="text-sm text-slate-500">Net Sales Base</span>
@@ -82,7 +85,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-rose-500 block">Remaining Due</span>
-          <span className="font-serif-display text-base font-bold text-rose-600 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-rose-600 block mt-0.5">
             {formatINR(totals.total_outstanding_due, true)}
           </span>
           <span className="text-sm text-slate-400">Customer Balances</span>
@@ -165,8 +168,8 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
                     <span className="font-semibold text-slate-900 block font-mono">
                       {item.invoice_number || 'N/A'}
                     </span>
-                    <span className="text-sm text-slate-400">
-                      {new Date(item.bill_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <span className="text-sm text-slate-400 tabular-nums">
+                      {fmtDate(item.bill_date)}
                     </span>
                   </td>
                   <td className="py-3 px-4 max-w-[180px]">
@@ -216,19 +219,7 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
                     {item.remaining_due > 0 ? formatINR(item.remaining_due, true) : '—'}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                        item.payment_status === 'SETTLED'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : item.payment_status === 'PARTIAL'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : item.payment_status === 'OVERDUE'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {item.payment_status}
-                    </span>
+                    <StatusBadge status={item.payment_status} />
                   </td>
                 </tr>
               ))}
@@ -257,23 +248,11 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="font-mono font-bold text-sm text-slate-900 block">{item.invoice_number || 'N/A'}</span>
-                <span className="text-sm text-slate-400">
-                  {new Date(item.bill_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                <span className="text-sm text-slate-400 tabular-nums">
+                  {fmtDate(item.bill_date)}
                 </span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                  item.payment_status === 'SETTLED'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : item.payment_status === 'PARTIAL'
-                    ? 'bg-amber-50 text-amber-700'
-                    : item.payment_status === 'OVERDUE'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
-              >
-                {item.payment_status}
-              </span>
+              <StatusBadge status={item.payment_status} />
             </div>
 
             <div className="pt-1 border-t border-slate-100 flex items-center justify-between">
@@ -311,6 +290,52 @@ export const SalesLedgerTable: React.FC<SalesLedgerTableProps> = ({ report, load
           </div>
         ))}
       </div>
+
+      {/* Sales Returns / Credit Notes */}
+      {(report.sales_returns?.length ?? 0) > 0 && (
+        <div className="bg-white rounded-3xl border border-amber-200 shadow-xs overflow-hidden">
+          <div className="px-6 py-4 border-b border-amber-100 bg-amber-50/60 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="tabular-nums text-sm font-bold text-slate-900">Sales Returns / Credit Notes</h3>
+              <p className="text-xs text-slate-600">Returns in this period reduce taxable sales and output GST.</p>
+            </div>
+            <div className="text-sm font-bold text-amber-900 font-mono">
+              Goods −{formatINR(totals.return_taxable ?? 0, true)} · GST −{formatINR(totals.return_gst ?? 0, true)} · Total −{formatINR(totals.total_returns ?? 0, true)}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 text-xs uppercase">
+                <tr>
+                  <th className="py-3 px-4">Return Date</th>
+                  <th className="py-3 px-4">Bill No.</th>
+                  <th className="py-3 px-4">Customer</th>
+                  <th className="py-3 px-4">Reason</th>
+                  <th className="py-3 px-4 text-right">Goods Value</th>
+                  <th className="py-3 px-4 text-right">GST on Return</th>
+                  <th className="py-3 px-4 text-right">Total Credit Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {report.sales_returns!.map(ret => (
+                  <tr key={ret.id} className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-4 font-mono text-slate-700 tabular-nums">{fmtDate(ret.return_date)}</td>
+                    <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">#{ret.invoice_number}</td>
+                    <td className="py-2.5 px-4 text-slate-800">{ret.customer_name}</td>
+                    <td className="py-2.5 px-4 text-slate-500">{ret.reason || '—'}</td>
+                    <td className="py-2.5 px-4 text-right font-mono text-slate-800 tabular-nums">− {formatINR(ret.taxable_value, true)}</td>
+                    <td className="py-2.5 px-4 text-right font-mono text-amber-800 tabular-nums">− {formatINR(ret.total_gst, true)}</td>
+                    <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
+                      − {formatINR(ret.total_amount, true)}
+                      {ret.total_gst > 0 && <span className="block text-[11px] font-normal text-slate-500">incl. GST {formatINR(ret.total_gst, true)}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

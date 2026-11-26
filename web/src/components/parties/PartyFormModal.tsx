@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Truck, Scissors, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Users, Truck, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { INDIAN_STATES, Party, PartyType, validateGSTIN } from '@yorbalance/shared';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -13,15 +13,16 @@ interface PartyFormModalProps {
   initialParty?: Party | null; // edit when given, add otherwise
   /** Pre-fill from a scanned invoice (name, GSTIN, phone…). */
   prefill?: Partial<Party> | null;
+  /** Initial party type to select when creating new */
+  initialType?: PartyType;
 }
 
 const TYPES: { type: PartyType; icon: typeof Users }[] = [
   { type: 'CUSTOMER', icon: Users },
-  { type: 'SUPPLIER', icon: Truck },
-  { type: 'ARTISAN', icon: Scissors }
+  { type: 'SUPPLIER', icon: Truck }
 ];
 
-export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, onSuccess, initialParty, prefill }) => {
+export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose, onSuccess, initialParty, prefill, initialType }) => {
   const { t } = useI18n();
   const { shop } = useAuth();
   const [type, setType] = useState<PartyType>('CUSTOMER');
@@ -41,7 +42,7 @@ export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose,
   useEffect(() => {
     if (!isOpen) return;
     const p = initialParty ?? prefill ?? {};
-    setType(p.type ?? 'CUSTOMER');
+    setType((p.type && p.type !== 'ARTISAN') ? p.type : (initialType && initialType !== 'ARTISAN') ? initialType : 'CUSTOMER');
     setName(p.name ?? '');
     setOwner(p.owner_name ?? '');
     setPhones([p.phone ?? '', ...(p.additional_phones ?? [])]);
@@ -71,7 +72,7 @@ export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose,
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = t('required');
     if (!owner.trim()) errs.owner_name = t('required');
-    if (phones[0].replace(/\D/g, '').length < 10) errs.phone = t('required');
+    if (phones[0].replace(/\D/g, '').length < 10) errs.phone = 'Contact number must be at least 10 digits';
     if (gstin && !validateGSTIN(gstin).valid) errs.gstin = validateGSTIN(gstin).error ?? 'GSTIN';
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -82,8 +83,8 @@ export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose,
       const d = await api.checkDuplicateParty({ phone: phones[0], gstin: gstin || undefined, excludePartyId: initialParty?.id });
       if (d.isDuplicate && d.existingParty) { setDup(d.existingParty); return; }
       const st = INDIAN_STATES.find(s => s.code === stateCode);
-      const payload = {
-        type, name, owner_name: owner, phone: phones[0], additional_phones: phones.slice(1).filter(p => p.trim()),
+      const payload: any = {
+        type, name, owner_name: owner.trim(), phone: phones[0], additional_phones: phones.slice(1).filter(p => p.trim()),
         gstin: gstin || null, address, state: st?.name ?? '', state_code: stateCode, pin_code: pin, notes: notes || null
       };
       const res = initialParty ? await api.updateParty(initialParty.id, payload) : await api.createParty(payload);
@@ -118,7 +119,7 @@ export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose,
 
         <div>
           <p className={lbl}>{t('who_is_party')}</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {TYPES.map(({ type: ty, icon: Icon }) => (
               <button key={ty} type="button" onClick={() => setType(ty)}
                 className={`min-h-[72px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 ${type === ty ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-200 text-slate-600'}`}>
@@ -160,6 +161,7 @@ export const PartyFormModal: React.FC<PartyFormModalProps> = ({ isOpen, onClose,
         </label>
         <label className={lbl}>{t('address')}
           <textarea rows={2} value={address} onChange={e => setAddress(e.target.value)} className={`${field} h-auto py-2`} />
+          {err('address')}
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className={lbl}>{t('state')}

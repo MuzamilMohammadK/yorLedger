@@ -20,7 +20,7 @@ export interface ReportBill {
   items: { name: string; qty: number }[];
   subtotal: number; cgst: number; sgst: number; igst: number; grand_total: number;
   paid_total: number;
-  returns: { taxable: number; cgst: number; sgst: number; igst: number; total: number }[];
+  returns: { id?: string; return_date?: string; reason?: string | null; taxable: number; cgst: number; sgst: number; igst: number; total: number }[];
 }
 
 export type ReportStatus = 'PENDING' | 'PARTIAL' | 'OVERDUE' | 'SETTLED';
@@ -48,7 +48,7 @@ export function reportStatus(b: ReportBill, today: string): ReportStatus {
 
 // ---------------------------------------------------------------- periods
 
-export interface ReportFilter { from?: string; to?: string; financialYear?: string; month?: string; quarter?: string; partySearch?: string; partyId?: string }
+export interface ReportFilter { allTime?: boolean; from?: string; to?: string; financialYear?: string; month?: string; quarter?: string; partySearch?: string; partyId?: string }
 
 /** Resolve the period. Default: current Indian financial year. */
 export function resolveReportPeriod(f: ReportFilter, today: string): { from: string; to: string; label: string } {
@@ -56,6 +56,7 @@ export function resolveReportPeriod(f: ReportFilter, today: string): { from: str
   // Accepts '2026-2027', 'FY 2026-27', '2026': the first four-digit number is the FY start year.
   const fyMatch = f.financialYear?.match(/(\d{4})/);
   const fyStart = fyMatch ? parseInt(fyMatch[1], 10) : tm >= 4 ? ty : ty - 1;
+  if (f.allTime) return { from: '0000-01-01', to: '9999-12-31', label: 'All time' };
   if (f.from || f.to) return { from: f.from || '0000-01-01', to: f.to || '9999-12-31', label: `${f.from || '…'} → ${f.to || '…'}` };
   if (f.month) {
     const [y, m] = f.month.split('-').map(Number);
@@ -77,10 +78,10 @@ function select(bills: ReportBill[], kind: ReportKind, f: ReportFilter, today: s
   const p = resolveReportPeriod(f, today);
   const needle = f.partySearch?.trim().toLowerCase();
   const list = bills
-    .filter(b => b.kind === kind && b.bill_date >= p.from && b.bill_date <= p.to)
+    .filter(b => b.kind === kind && (b.bill_date ?? '') >= p.from && (b.bill_date ?? '') <= p.to)
     .filter(b => !f.partyId || b.party_id === f.partyId)
-    .filter(b => !needle || b.party_name.toLowerCase().includes(needle) || (b.party_gstin ?? '').toLowerCase().includes(needle))
-    .sort((a, b) => a.bill_date.localeCompare(b.bill_date) || a.invoice_no.localeCompare(b.invoice_no, undefined, { numeric: true }));
+    .filter(b => !needle || (b.party_name ?? '').toLowerCase().includes(needle) || (b.party_gstin ?? '').toLowerCase().includes(needle))
+    .sort((a, b) => (a.bill_date ?? '').localeCompare(b.bill_date ?? '') || String(a.invoice_no ?? '').localeCompare(String(b.invoice_no ?? ''), undefined, { numeric: true }));
   return { list, period: p };
 }
 
@@ -129,12 +130,49 @@ export function salesLedger(bills: ReportBill[], f: ReportFilter, today: string)
       payment_status: reportStatus(b, today)
     };
   });
+
+  // Sales returns / credit notes filtered by return_date (falling back to bill_date)
+  const needle = f.partySearch?.trim().toLowerCase();
+  const retT = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
+  const sales_returns: Array<{
+    id: string; bill_id: string; invoice_number: string; customer_name: string;
+    return_date: string; reason: string | null;
+    taxable_value: number; cgst: number; sgst: number; igst: number; total_gst: number; total_amount: number;
+  }> = [];
+  for (const b of bills) {
+    if (b.kind !== 'SALE') continue;
+    if (f.partyId && b.party_id !== f.partyId) continue;
+    if (needle && !(b.party_name ?? '').toLowerCase().includes(needle) && !(b.party_gstin ?? '').toLowerCase().includes(needle)) continue;
+    b.returns.forEach((r, idx) => {
+      const rDate = r.return_date || b.bill_date || '';
+      if (rDate < period.from || rDate > period.to) return;
+      retT.taxable += r.taxable; retT.cgst += r.cgst; retT.sgst += r.sgst; retT.igst += r.igst; retT.total += r.total;
+      sales_returns.push({
+        id: r.id || `${b.id}-ret-${idx}`,
+        bill_id: b.id,
+        invoice_number: b.invoice_no,
+        customer_name: b.party_name,
+        return_date: rDate,
+        reason: r.reason ?? null,
+        taxable_value: r2(r.taxable),
+        cgst: r2(r.cgst),
+        sgst: r2(r.sgst),
+        igst: r2(r.igst),
+        total_gst: r2(r.cgst + r.sgst + r.igst),
+        total_amount: r2(r.total)
+      });
+    });
+  }
+  sales_returns.sort((a, b) => b.return_date.localeCompare(a.return_date));
+
   return {
-    items, period,
+    items, sales_returns, period,
     totals: {
       total_taxable_sales: r2(T.taxable), total_cgst: r2(T.cgst), total_sgst: r2(T.sgst), total_igst: r2(T.igst),
       total_output_gst: r2(T.gst), total_sales_value: r2(T.value), total_paid: r2(T.paid), total_outstanding_due: r2(T.due),
-      intra_state_sales: r2(T.intra), inter_state_sales: r2(T.inter), total_returns: r2(T.returns)
+      intra_state_sales: r2(T.intra), inter_state_sales: r2(T.inter), total_returns: r2(retT.total || T.returns),
+      return_taxable: r2(retT.taxable), return_cgst: r2(retT.cgst), return_sgst: r2(retT.sgst), return_igst: r2(retT.igst),
+      return_gst: r2(retT.cgst + retT.sgst + retT.igst)
     }
   };
 }
@@ -160,10 +198,10 @@ export function jobWorkLedger(bills: ReportBill[], f: ReportFilter, today: strin
     };
   });
   // Grouped by artisan (§11.5).
-  items.sort((x, y) => x.artisan_name.localeCompare(y.artisan_name) || x.transaction_date.localeCompare(y.transaction_date));
+  items.sort((x, y) => (x.artisan_name ?? '').localeCompare(y.artisan_name ?? '') || (x.transaction_date ?? '').localeCompare(y.transaction_date ?? ''));
   return {
     items, period,
-    artisan_summaries: [...byArtisan.values()].sort((a, b) => a.artisan_name.localeCompare(b.artisan_name)).map(a => ({
+    artisan_summaries: [...byArtisan.values()].sort((a, b) => (a.artisan_name ?? '').localeCompare(b.artisan_name ?? '')).map(a => ({
       artisan_id: a.artisan_id, artisan_name: a.artisan_name, total_job_work_value: r2(a.v), total_gst: r2(a.g),
       total_payments: r2(a.p), outstanding_amount: r2(a.d), transaction_count: a.n
     })),
@@ -177,33 +215,58 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export function gstDashboard(bills: ReportBill[], f: ReportFilter, today: string) {
   const period = resolveReportPeriod({ ...f, partySearch: undefined, partyId: undefined }, today);
-  const inP = bills.filter(b => b.bill_date >= period.from && b.bill_date <= period.to);
+  const inP = bills.filter(b => (b.bill_date ?? '') >= period.from && (b.bill_date ?? '') <= period.to);
   const months = new Map<string, { sales: number; purchases: number; out: number; oc: number; os: number; oi: number; itc: number }>();
   const mk = (d: string) => {
-    const k = d.slice(0, 7);
+    const k = (d || '').slice(0, 7);
     if (!months.has(k)) months.set(k, { sales: 0, purchases: 0, out: 0, oc: 0, os: 0, oi: 0, itc: 0 });
     return months.get(k)!;
   };
-  let taxableSales = 0, oc = 0, os = 0, oi = 0, ic = 0, is = 0, ii = 0;
+  let taxableSales = 0, grossOc = 0, grossOs = 0, grossOi = 0, retOc = 0, retOs = 0, retOi = 0, ic = 0, is = 0, ii = 0;
   for (const b of inP) {
     const e = effective(b);
     const m = mk(b.bill_date);
     if (b.kind === 'SALE') {
-      taxableSales += e.taxable; oc += e.cgst; os += e.sgst; oi += e.igst;
-      m.sales += e.taxable; m.out += e.gst; m.oc += e.cgst; m.os += e.sgst; m.oi += e.igst;
+      taxableSales += b.subtotal;
+      grossOc += b.cgst; grossOs += b.sgst; grossOi += b.igst;
+      m.sales += b.subtotal; m.out += b.cgst + b.sgst + b.igst; m.oc += b.cgst; m.os += b.sgst; m.oi += b.igst;
     } else if (b.kind === 'PURCHASE') {
       m.purchases += e.taxable;
       if (b.party_gstin) { ic += e.cgst; is += e.sgst; ii += e.igst; m.itc += e.gst; }
     }
   }
+  // Deduct sales returns in the period they were made (falling back to bill_date when return_date is absent)
+  for (const b of bills) {
+    if (b.kind !== 'SALE') continue;
+    for (const r of b.returns) {
+      const rDate = r.return_date || b.bill_date;
+      if (rDate < period.from || rDate > period.to) continue;
+      taxableSales -= r.taxable;
+      retOc += r.cgst; retOs += r.sgst; retOi += r.igst;
+      const m = mk(rDate);
+      m.sales -= r.taxable;
+      m.out -= (r.cgst + r.sgst + r.igst);
+      m.oc -= r.cgst;
+      m.os -= r.sgst;
+      m.oi -= r.igst;
+    }
+  }
+  const oc = grossOc - retOc;
+  const os = grossOs - retOs;
+  const oi = grossOi - retOi;
   const output = oc + os + oi;
   const itc = ic + is + ii;
   const keys = [...months.keys()].sort();
-  const label = (k: string) => `${MONTHS[Number(k.slice(5)) - 1]} ${k.slice(2, 4)}`;
+  const label = (k: string) => `${MONTHS[Number(k.slice(5)) - 1] ?? k} ${k.slice(2, 4)}`;
   return {
     period,
     summary: { total_taxable_sales: r2(taxableSales), output_gst: r2(output), eligible_itc: r2(itc), net_gst_payable: r2(output - itc) },
-    tax_breakdown: { output_cgst: r2(oc), output_sgst: r2(os), output_igst: r2(oi), input_cgst: r2(ic), input_sgst: r2(is), input_igst: r2(ii) },
+    tax_breakdown: {
+      output_cgst: r2(oc), output_sgst: r2(os), output_igst: r2(oi),
+      gross_output_cgst: r2(grossOc), gross_output_sgst: r2(grossOs), gross_output_igst: r2(grossOi),
+      return_cgst: r2(retOc), return_sgst: r2(retOs), return_igst: r2(retOi),
+      input_cgst: r2(ic), input_sgst: r2(is), input_igst: r2(ii)
+    },
     charts: {
       monthly_sales_vs_purchases: keys.map(k => ({ month: label(k), sales: r2(months.get(k)!.sales), purchases: r2(months.get(k)!.purchases) })),
       monthly_output_gst_trend: keys.map(k => { const m = months.get(k)!; return { month: label(k), output_gst: r2(m.out), cgst: r2(m.oc), sgst: r2(m.os), igst: r2(m.oi) }; }),

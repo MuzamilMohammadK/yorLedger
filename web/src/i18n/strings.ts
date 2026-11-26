@@ -29,8 +29,8 @@ const en = {
   required: 'Required',
   rupee: '₹',
   // bill kinds — what the shop did
-  kind_SALE: 'Sold',
-  kind_PURCHASE: 'Bought',
+  kind_SALE: 'Sale',
+  kind_PURCHASE: 'Purchase',
   kind_JOB_WORK: 'Job work',
   kind_SALE_hint: 'Customer buys from you',
   kind_PURCHASE_hint: 'You buy from supplier',

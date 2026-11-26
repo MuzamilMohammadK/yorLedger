@@ -47,11 +47,28 @@ export const AddReturnModal: React.FC<AddReturnModalProps> = ({ isOpen, onClose,
     }
   }, [qty, raw]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const qtyErrors = useMemo(() => {
+    const errs: Record<number, string> = {};
+    (transaction?.items ?? []).forEach((it, i) => {
+      const left = it.quantity - (returnedQty[String(i)] ?? 0);
+      const cur = qty[i] ?? 0;
+      if (cur > left) errs[i] = `Only ${left} left to return`;
+    });
+    return errs;
+  }, [qty, transaction, returnedQty]);
+
+  const hasQtyError = Object.keys(qtyErrors).length > 0;
+  const pct = (raw?.gst_bp ?? 0) / 100;
+
   if (!isOpen || !transaction) return null;
   const rs = (p: number) => formatPaiseToINR(p, true);
   const field = 'w-full h-12 px-3 rounded-xl border-2 border-slate-200 bg-white text-base text-slate-900 focus:border-indigo-600 focus:outline-none';
 
   const save = async () => {
+    if (hasQtyError) {
+      setFormError('Fix return quantities that exceed remaining returnable quantity.');
+      return;
+    }
     const lines = Object.entries(qty).map(([i, q]) => ({ index: Number(i), qty: q })).filter(l => l.qty > 0);
     if (!lines.length) { setFormError(t('nothing_selected')); return; }
     setBusy(true);
@@ -82,9 +99,11 @@ export const AddReturnModal: React.FC<AddReturnModalProps> = ({ isOpen, onClose,
             const done = returnedQty[String(i)] ?? 0;
             const left = it.quantity - done;
             const cur = qty[i] ?? 0;
-            const set = (n: number) => setQty({ ...qty, [i]: Math.max(0, Math.min(left, n)) });
+            const rowErr = qtyErrors[i];
+            const setStep = (n: number) => setQty({ ...qty, [i]: Math.max(0, Math.min(left, n)) });
+            const setTyped = (n: number) => setQty({ ...qty, [i]: Math.max(0, n) });
             return (
-              <div key={it.id} className="rounded-2xl border-2 border-slate-200 p-3">
+              <div key={it.id} className={`rounded-2xl border-2 p-3 ${rowErr ? 'border-rose-400 bg-rose-50/30' : 'border-slate-200'}`}>
                 <p className="text-base font-bold text-slate-900">{it.item_name}</p>
                 <p className="text-sm text-slate-600">
                   {t('bought_qty')}: {it.quantity} · {t('already_returned')}: {done} · {rs(it.rate_paise)}
@@ -92,14 +111,18 @@ export const AddReturnModal: React.FC<AddReturnModalProps> = ({ isOpen, onClose,
                 {left > 0 ? (
                   <div className="mt-2 flex items-center gap-3">
                     <span className="text-base text-slate-700 flex-1">{t('return_now')}</span>
-                    <button type="button" aria-label="−" onClick={() => set(cur - 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Minus className="w-5 h-5" /></button>
+                    <button type="button" aria-label="−" onClick={() => setStep(cur - 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Minus className="w-5 h-5" /></button>
                     <input inputMode="numeric" value={cur || ''} placeholder="0" aria-label={t('return_now')}
-                      onChange={e => set(parseInt(e.target.value.replace(/\D/g, '') || '0', 10))}
-                      className="w-16 h-12 text-center rounded-xl border-2 border-slate-300 text-xl font-bold" />
-                    <button type="button" aria-label="+" onClick={() => set(cur + 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Plus className="w-5 h-5" /></button>
+                      onChange={e => setTyped(parseInt(e.target.value.replace(/\D/g, '') || '0', 10))}
+                      className={`w-16 h-12 text-center rounded-xl border-2 text-xl font-bold ${rowErr ? 'border-rose-500 text-rose-700' : 'border-slate-300'}`} />
+                    <button type="button" aria-label="+" onClick={() => setStep(cur + 1)} className="w-12 h-12 rounded-xl border-2 border-slate-300 flex items-center justify-center"><Plus className="w-5 h-5" /></button>
                   </div>
                 ) : null}
-                {left > 0 && <p className="mt-1 text-sm text-slate-500">{t('can_return', { n: left })}</p>}
+                {rowErr ? (
+                  <p className="mt-1 text-sm font-semibold text-rose-600">{rowErr}</p>
+                ) : (
+                  left > 0 && <p className="mt-1 text-sm text-slate-500">{t('can_return', { n: left })}</p>
+                )}
               </div>
             );
           })}
@@ -114,12 +137,35 @@ export const AddReturnModal: React.FC<AddReturnModalProps> = ({ isOpen, onClose,
           </label>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 text-white p-4 flex justify-between items-baseline">
-          <span className="text-lg">{t('return_value')}</span>
-          <span className="text-3xl font-bold">{rs(preview?.totalReduction ?? 0)}</span>
+        <div className="rounded-2xl bg-slate-900 text-white p-4 space-y-1.5">
+          <div className="flex justify-between text-sm text-slate-300">
+            <span>Goods value (qty × rate)</span>
+            <span>{rs(preview?.taxableReduction ?? 0)}</span>
+          </div>
+          {raw?.tax_mode === 'INTER' ? (
+            <div className="flex justify-between text-sm text-slate-300">
+              <span>IGST {pct}%</span>
+              <span>{rs(preview?.igst ?? 0)}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm text-slate-300">
+                <span>CGST {pct / 2}%</span>
+                <span>{rs(preview?.cgst ?? 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-300">
+                <span>SGST {pct / 2}%</span>
+                <span>{rs(preview?.sgst ?? 0)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between items-baseline pt-2 border-t border-slate-700 gap-2">
+            <span className="text-sm sm:text-base font-semibold">Amount to give back / adjust (including GST)</span>
+            <span className="text-2xl font-bold shrink-0">{rs(preview?.totalReduction ?? 0)}</span>
+          </div>
         </div>
 
-        <button type="button" onClick={save} disabled={busy || !preview}
+        <button type="button" onClick={save} disabled={busy || !preview || hasQtyError}
           className="w-full h-14 rounded-2xl bg-indigo-700 text-white text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-60">
           {busy ? <><Loader2 className="w-6 h-6 animate-spin" /> {t('saving')}</> : t('save_return')}
         </button>

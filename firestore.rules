@@ -24,7 +24,14 @@ service cloud.firestore {
 
     // ---------- helpers ----------
     function signedIn() { return request.auth != null; }
-    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function adminRole() {
+      return signedIn() && request.auth.token.admin == true
+        ? request.auth.token.get('adminRole', 'super_admin')
+        : null;
+    }
+    function isAdmin() { return adminRole() in ['super_admin', 'support', 'viewer']; }
+    function isSupportOrAbove() { return adminRole() in ['super_admin', 'support']; }
+    function isSuperAdmin() { return adminRole() == 'super_admin'; }
     function shopDoc(shopId) { return get(/databases/$(database)/documents/shops/$(shopId)); }
     function ownsShop(shopId) {
       return signedIn() && shopDoc(shopId).data.owner_uid == request.auth.uid;
@@ -71,7 +78,7 @@ service cloud.firestore {
         && request.resource.data.owner_uid == request.auth.uid
         && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.shop_id)).data.owner_uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['kind', 'shop_id', 'shop_name', 'owner_uid', 'read_at', 'created_at']);
-      allow update: if isAdmin() && onlyChanges(['read_at']);
+      allow update: if isSupportOrAbove() && onlyChanges(['read_at']);
       allow delete: if false;
     }
 
@@ -89,9 +96,9 @@ service cloud.firestore {
         && !('verified_by' in request.resource.data);
 
       allow update: if
-        // Admin decision: only status + verification fields.
-        (isAdmin() && onlyChanges(['status', 'verified_at', 'verified_by', 'rejection_reason', 'updated_at'])
-          && request.resource.data.status in ['APPROVED', 'REJECTED'])
+        // Admin decision & metadata (super_admin / support only, never viewer).
+        (isSupportOrAbove() && onlyChanges(['status', 'verified_at', 'verified_by', 'rejection_reason', 'suspension_reason', 'updated_at', 'is_test_shop', 'admin_notes', 'feature_flags', 'plan'])
+          && request.resource.data.status in ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'])
         // Rejected owner corrects details and resubmits -> back to PENDING.
         || (ownsShop(shopId) && resource.data.status == 'REJECTED'
           && request.resource.data.status == 'PENDING'
@@ -117,13 +124,13 @@ service cloud.firestore {
           && request.resource.data.verification_status == 'PENDING';
         allow delete: if ownsShop(shopId) && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.status == 'PENDING';
         // Admin reviews each document.
-        allow update: if isAdmin() && onlyChanges(['verification_status', 'admin_comment'])
+        allow update: if isSupportOrAbove() && onlyChanges(['verification_status', 'admin_comment'])
           && request.resource.data.verification_status in ['APPROVED', 'REJECTED', 'PENDING'];
       }
 
       match /verifications/{id} {
         allow read: if ownsShop(shopId) || isAdmin();
-        allow create: if isAdmin();
+        allow create: if isSupportOrAbove();
         allow update, delete: if false;
       }
 
@@ -253,6 +260,12 @@ service cloud.firestore {
       match /stockMovements/{id} {
         allow read, write: if approvedOwner(shopId);
       }
+      match /stockCounts/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /stockItems/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
       match /rawMaterials/{id} {
         allow read, write: if approvedOwner(shopId);
       }
@@ -277,6 +290,58 @@ service cloud.firestore {
       match /polishing/{id} {
         allow read, write: if approvedOwner(shopId);
       }
+      match /polishPayments/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /looms/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+      match /weaverPayments/{id} {
+        allow read, write: if approvedOwner(shopId);
+      }
+    }
+
+    // ---------- Admin Portal Collections ----------
+    match /adminStats/{id} {
+      allow read: if isAdmin();
+      allow write: if isSupportOrAbove();
+    }
+    match /adminHealth/{id} {
+      allow read: if isAdmin();
+      allow write: if isSupportOrAbove();
+    }
+    match /adminDataQuality/{id} {
+      allow read: if isAdmin();
+      allow write: if isSupportOrAbove();
+    }
+    match /adminAudit/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.admin_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+    match /adminSettings/{id} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+    match /adminBackupRequests/{id} {
+      allow read: if isAdmin();
+      allow create: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+    match /systemConfig/{id} {
+      allow read: if true;
+      allow write: if isSupportOrAbove();
+    }
+    match /systemErrors/{id} {
+      allow create: if signedIn();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+    match /feedback/{id} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isSupportOrAbove() && onlyChanges(['status', 'updated_by', 'updated_at']);
+      allow delete: if false;
     }
   }
 }

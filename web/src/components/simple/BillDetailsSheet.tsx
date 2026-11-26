@@ -10,6 +10,7 @@ import { todayIST } from '../../lib/data/util';
 import { billMessage, openWhatsApp } from '../../lib/whatsapp';
 import { openBillPdf, shareBillPdf } from '../../lib/pdf';
 import { Sheet } from '../ui/Sheet';
+import { StatusBadge } from '../ui/StatusBadge';
 import { AddReturnModal } from '../history/AddReturnModal';
 import { useShell } from '../layout/AppShell';
 import { statusOf } from './BillRow';
@@ -42,6 +43,26 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
   const credit = raw ? Math.max(0, -raw.amount_due) : 0;
   const st = statusOf(bill);
   const pct = (raw?.gst_bp ?? 0) / 100;
+  const isInter = bill.igst_paise > 0 || raw?.tax_mode === 'INTER';
+
+  const retTotal = bill.return_paise ?? 0;
+  const billReturns = bill.returns ?? [];
+  const retGoodsTotal = billReturns.length
+    ? billReturns.reduce((s, r) => s + (r.taxable_paise ?? 0), 0)
+    : (bill.grand_total_paise > 0 ? Math.round((retTotal * bill.subtotal_paise) / bill.grand_total_paise) : retTotal);
+  const retTaxTotal = Math.max(0, retTotal - retGoodsTotal);
+  const retIgstTotal = billReturns.length
+    ? billReturns.reduce((s, r) => s + (r.igst_paise ?? 0), 0)
+    : (isInter ? retTaxTotal : 0);
+  const retCgstTotal = billReturns.length
+    ? billReturns.reduce((s, r) => s + (r.cgst_paise ?? 0), 0)
+    : (isInter ? 0 : retTaxTotal - Math.floor(retTaxTotal / 2));
+  const retSgstTotal = billReturns.length
+    ? billReturns.reduce((s, r) => s + (r.sgst_paise ?? 0), 0)
+    : (isInter ? 0 : Math.floor(retTaxTotal / 2));
+  const netBillValue = Math.max(0, bill.grand_total_paise - retTotal);
+  const netTaxable = Math.max(0, bill.subtotal_paise - retGoodsTotal);
+  const netGst = Math.max(0, bill.tax_paise - retTaxTotal);
 
   const act = async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -61,12 +82,17 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xl font-bold text-slate-900">{bill.party_name}</p>
-              <p className="text-base text-slate-600">{t(`type_${party?.type ?? bill.party_type}` as any)} · {party?.phone ?? ''}</p>
-              <p className="text-sm text-slate-500">{party?.gstin ?? '—'} · {getStateByCode(party?.state_code ?? '')?.name ?? '—'}</p>
-              <p className="text-base text-slate-700 mt-1">{t('date')}: <b>{fmtDate(bill.invoice_date)}</b> · {raw?.tax_mode === 'INTER' ? t('other_state') : t('same_state')}</p>
-              {bill.hsn_code && <p className="text-sm font-mono text-slate-600 mt-0.5">HSN/SAC: <b>{bill.hsn_code}</b></p>}
+              <p className="text-base text-slate-600">
+                {bill.type === 'JOB_WORK'
+                  ? `Customer · ${bill.party_phone || (bill as any).customer_phone || party?.phone || ''}`
+                  : `${t(`type_${party?.type ?? bill.party_type}` as any)} · ${party?.phone ?? ''}`}
+              </p>
+              {bill.type !== 'JOB_WORK' && (
+                <p className="text-sm text-slate-500">{party?.gstin ?? '—'} · {getStateByCode(party?.state_code ?? '')?.name ?? '—'}</p>
+              )}
+              <p className="text-base text-slate-700 mt-1">{t('date')}: <b>{fmtDate(bill.invoice_date)}</b>{bill.type !== 'JOB_WORK' ? ` · ${raw?.tax_mode === 'INTER' ? t('other_state') : t('same_state')}` : ''}</p>
             </div>
-            <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold ${BADGE[st]}`}>{t(`status_${st}` as any)}</span>
+            <StatusBadge status={st} className="shrink-0" />
           </div>
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-base flex gap-2"><AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" /> {error}</div>
@@ -76,29 +102,68 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
           <div className="overflow-x-auto rounded-2xl border border-slate-200" data-no-swipe>
             <table className="min-w-full">
               <thead className="bg-slate-50 text-left text-sm text-slate-600">
-                <tr><th className="px-3 py-2">{t('item_name')}</th><th className="px-3 py-2 text-right">{t('qty')}</th><th className="px-3 py-2 text-right">{t('rate')}</th><th className="px-3 py-2 text-right">{t('line_total')}</th></tr>
+                <tr>
+                  <th className="px-3 py-2">{t('item_name')}</th>
+                  {bill.type !== 'JOB_WORK' && <th className="px-3 py-2">HSN/SAC</th>}
+                  <th className="px-3 py-2 text-right">{t('qty')}</th>
+                  <th className="px-3 py-2 text-right">{t('rate')}</th>
+                  <th className="px-3 py-2 text-right">{t('line_total')}</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {(bill.items ?? []).map((it, i) => (
-                  <tr key={it.id}>
-                    <td className="px-3 py-2 text-base">{it.item_name}{(returnedQty[String(i)] ?? 0) > 0 && <span className="block text-sm text-slate-500">{t('returned')}: {returnedQty[String(i)]}</span>}</td>
-                    <td className="px-3 py-2 text-base text-right">{it.quantity}</td>
-                    <td className="px-3 py-2 text-base text-right whitespace-nowrap">{rs(it.rate_paise)}</td>
-                    <td className="px-3 py-2 text-base text-right whitespace-nowrap font-semibold">{rs(it.amount_paise)}</td>
-                  </tr>
-                ))}
+                {(bill.items ?? []).map((it, i) => {
+                  const retCount = returnedQty[String(i)] ?? 0;
+                  const retGoods = retCount * it.rate_paise;
+                  const retGst = Math.round((retGoods * (raw?.gst_bp ?? 0)) / 10000);
+                  return (
+                    <tr key={it.id}>
+                      <td className="px-3 py-2 text-base">
+                        {it.item_name}
+                        {retCount > 0 && (
+                          <span className="block text-xs font-medium text-amber-800 mt-0.5">
+                            Returned: {retCount} {retCount === 1 ? 'saree' : 'sarees'} · {rs(retGoods)}{pct > 0 ? ` + GST ${rs(retGst)}` : ''}
+                          </span>
+                        )}
+                      </td>
+                      {bill.type !== 'JOB_WORK' && <td className="px-3 py-2 text-sm font-mono text-slate-600 whitespace-nowrap">{it.hsn_code || '—'}</td>}
+                      <td className="px-3 py-2 text-base text-right">{it.quantity}</td>
+                      <td className="px-3 py-2 text-base text-right whitespace-nowrap">{rs(it.rate_paise)}</td>
+                      <td className="px-3 py-2 text-base text-right whitespace-nowrap font-semibold">{rs(it.amount_paise)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* GST breakdown and dues (§10.3) */}
           <div className="space-y-1">
+            {bill.type === 'JOB_WORK' && row('Total sarees', (bill.items ?? []).reduce((s, it) => s + (it.quantity || 0), 0))}
             {row(t('items_total'), rs(bill.subtotal_paise))}
-            {bill.igst_paise > 0 || raw?.tax_mode === 'INTER'
+            {isInter
               ? row(`IGST ${pct}%`, rs(bill.igst_paise))
               : <>{row(`CGST ${pct / 2}%`, rs(bill.cgst_paise))}{row(`SGST ${pct / 2}%`, rs(bill.sgst_paise))}</>}
             {row(t('bill_total'), rs(bill.grand_total_paise), true)}
-            {row(t('returned'), `− ${rs(bill.return_paise ?? 0)}`)}
+            {retTotal > 0 ? (
+              <div className="pt-1.5 pb-1 border-y border-slate-100 space-y-1">
+                {row('Less: Returned goods', `− ${rs(retGoodsTotal)}`)}
+                {(pct > 0 || retTaxTotal > 0) && (
+                  isInter
+                    ? row(`Less: GST on returns (IGST ${pct}%)`, `− ${rs(retIgstTotal)}`)
+                    : <>
+                        {row(`Less: CGST on returns (${pct / 2}%)`, `− ${rs(retCgstTotal)}`)}
+                        {row(`Less: SGST on returns (${pct / 2}%)`, `− ${rs(retSgstTotal)}`)}
+                      </>
+                )}
+                {row('Total returned', `− ${rs(retTotal)}`)}
+                {row('Net bill value', rs(netBillValue), true)}
+                <p className="text-xs text-slate-500 text-right">
+                  Net taxable value {rs(netTaxable)} · Net GST {rs(netGst)}
+                </p>
+              </div>
+            ) : (
+              row(t('returned'), `− ${rs(0)}`)
+            )}
             {row(t('paid'), `− ${rs(bill.paid_paise)}`)}
             {row(t('remaining'), rs(bill.pending_paise), true)}
             {credit > 0 && row(t('credit'), rs(credit))}
@@ -140,11 +205,30 @@ export const BillDetailsSheet: React.FC<{ bill: Transaction; onClose: () => void
           {!!bill.returns?.length && (
             <section>
               <h3 className="text-base font-bold text-slate-900 mb-2">{t('returns_list')}</h3>
-              {bill.returns.map(r => (
-                <div key={r.id} className="p-3 mb-2 rounded-xl bg-slate-50 border border-slate-200 flex justify-between text-base">
-                  <span>{fmtDate(r.return_date)}{r.reason ? ` · ${r.reason}` : ''}</span><span className="font-bold">− {rs(r.amount_paise)}</span>
-                </div>
-              ))}
+              <div className="space-y-2">
+                {bill.returns.map(r => {
+                  const rTax = r.tax_paise ?? ((r.cgst_paise ?? 0) + (r.sgst_paise ?? 0) + (r.igst_paise ?? 0));
+                  const rGoods = r.taxable_paise ?? Math.max(0, r.amount_paise - rTax);
+                  const itemsSummary = (r.items ?? []).map(it => `${it.qty} × ${it.name}`).join(', ');
+                  const gstSplit = isInter
+                    ? `GST ${rs(rTax)}`
+                    : `GST ${rs(rTax)}${rTax > 0 ? ` (CGST ${rs(r.cgst_paise ?? 0)} + SGST ${rs(r.sgst_paise ?? 0)})` : ''}`;
+                  return (
+                    <div key={r.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="flex justify-between gap-2 text-sm text-slate-700">
+                        <span className="font-semibold">
+                          {fmtDate(r.return_date)}{r.reason ? ` · ${r.reason}` : ''}
+                        </span>
+                        <span className="font-bold text-slate-900 shrink-0">− {rs(r.amount_paise)}</span>
+                      </div>
+                      {itemsSummary && <p className="text-xs font-medium text-slate-800">{itemsSummary}</p>}
+                      <p className="text-xs text-slate-600">
+                        Goods {rs(rGoods)} · {gstSplit} · Total {rs(r.amount_paise)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           )}
 

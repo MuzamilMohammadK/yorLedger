@@ -9,3 +9,6 @@ export * from './pager.js';
 export * from './statement.js';
 export * from './payment.js';
 export * from './reports.js';
+export * from './tally.js';
+export * from './stockRework.js';
+export * from './admin.js';

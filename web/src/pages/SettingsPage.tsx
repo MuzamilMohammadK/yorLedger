@@ -86,20 +86,20 @@ export const SettingsPage: React.FC = () => {
   const statusCls = shop?.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : shop?.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-900';
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-900">{t('nav_settings')}</h1>
-      <div className="md:grid md:grid-cols-[16rem_1fr] md:gap-6">
-        {/* Section list: chips on phones, side list on desktop */}
-        <nav className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
+    <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      <h1 className="shrink-0 text-2xl font-bold text-slate-900">{t('nav_settings')}</h1>
+      <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-[16rem_1fr] md:gap-6 overflow-hidden">
+        {/* Section list: constant/sticky on phones and desktop */}
+        <nav className="shrink-0 flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto pb-2 md:pb-0 -mx-1 px-1">
           {SECTIONS.map(s => (
             <button key={s.id} onClick={() => { setSection(s.id); setMsg(null); }}
-              className={`shrink-0 h-12 px-4 rounded-xl text-base font-semibold flex items-center gap-2 text-left ${section === s.id ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+              className={`shrink-0 h-11 px-4 rounded-xl text-sm sm:text-base font-semibold flex items-center gap-2 text-left ${section === s.id ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
               <s.icon className="w-5 h-5 shrink-0" /> {t(s.key as any)}
             </button>
           ))}
         </nav>
 
-        <div className="mt-3 md:mt-0 rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto mt-2 md:mt-0 rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 space-y-4">
           <h2 className="text-xl font-bold text-slate-900">{t(SECTIONS.find(s => s.id === section)!.key as any)}</h2>
           {msg && (
             <p className={`p-3 rounded-xl text-base flex items-center gap-2 ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>

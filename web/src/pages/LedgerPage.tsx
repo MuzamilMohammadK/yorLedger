@@ -37,7 +37,7 @@ export const LedgerPage: React.FC = () => {
 
   const statement = useMemo(() => {
     if (!partyId) return [];
-    const pb = cache.rawBills().filter(b => b.party_id === partyId);
+    const pb = cache.rawBills().filter(b => b.party_id === partyId && b.kind !== 'JOB_WORK');
     const ids = new Set(pb.map(b => b.id));
     return partyStatement(
       pb.map(b => ({ id: b.id, kind: b.kind, invoice_no: String(b.invoice_no), date: b.bill_date, grand_total: b.grand_total })),
@@ -54,7 +54,7 @@ export const LedgerPage: React.FC = () => {
       (digits.length >= 3 && [p.phone, ...(p.additional_phones ?? [])].some(x => x.includes(digits)))).slice(0, 8);
   }, [parties, q]);
 
-  const recent = (kinds: string[]) => (bills ?? []).filter(b => kinds.includes(b.type) && (!partyId || b.party_id === partyId)).slice(0, 10);
+  const recent = (kinds: string[]) => (bills ?? []).filter(b => kinds.includes(b.type) && (!partyId || b.party_id === partyId) && b.type !== 'JOB_WORK').slice(0, 10);
   const onNewParty = () => navigate('/parties?new=1');
 
   const partyView = (
@@ -100,26 +100,28 @@ export const LedgerPage: React.FC = () => {
             </div>
           </div>
 
-          <section className="rounded-2xl bg-white border border-slate-200">
+          <section className="rounded-2xl bg-white border border-slate-200 overflow-hidden">
             <h2 className="px-4 pt-4 text-lg font-bold text-slate-900">{t('party_ledger')}</h2>
             {!statement.length && <p className="p-4 text-base text-slate-500">{t('no_bills')}</p>}
-            <div className="overflow-x-auto" data-no-swipe>
-              <table className="min-w-full">
-                <thead><tr className="text-left text-sm text-slate-500">
-                  <th className="px-4 py-2">{t('col_date')}</th><th className="px-4 py-2">{t('col_details')}</th>
-                  <th className="px-4 py-2 text-right">{t('col_amount')}</th><th className="px-4 py-2 text-right">{t('col_balance')}</th>
+            <div className="w-full overflow-x-hidden" data-no-swipe>
+              <table className="w-full table-fixed">
+                <thead><tr className="text-left text-xs uppercase text-slate-500 border-b border-slate-100">
+                  <th className="w-[96px] px-3 py-2.5">{t('col_date')}</th>
+                  <th className="px-3 py-2.5">{t('col_details')}</th>
+                  <th className="w-[100px] sm:w-[120px] px-3 py-2.5 text-right">{t('col_amount')}</th>
+                  <th className="w-[100px] sm:w-[120px] px-3 py-2.5 text-right">{t('col_balance')}</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {statement.map(r => (
                     <tr key={`${r.type}-${r.id}`} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/history?bill=${r.bill_id}`)}>
-                      <td className="px-4 py-3 text-base whitespace-nowrap">{fmtDate(r.date)}</td>
-                      <td className="px-4 py-3 text-base">
+                      <td className="px-3 py-3 text-xs sm:text-sm tx-num">{fmtDate(r.date)}</td>
+                      <td className="px-3 py-3 text-xs sm:text-sm break-words">
                         {r.type === 'BILL' ? t(`kind_${r.kind}`) : r.type === 'PAYMENT' ? `${t('entry_payment')} (${t(`mode_${r.detail}` as any)})` : t('entry_return')} · #{r.invoice_no}
                       </td>
-                      <td className={`px-4 py-3 text-base text-right whitespace-nowrap font-semibold ${r.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      <td className={`px-3 py-3 text-xs sm:text-sm text-right tx-num font-semibold ${r.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                         {r.amount >= 0 ? '+' : '−'}{rs(Math.abs(r.amount))}
                       </td>
-                      <td className="px-4 py-3 text-base text-right whitespace-nowrap font-bold">{rs(r.balance)}</td>
+                      <td className="px-3 py-3 text-xs sm:text-sm text-right tx-num font-bold">{rs(r.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -133,7 +135,7 @@ export const LedgerPage: React.FC = () => {
 
   const billView = (kinds: ('SALE' | 'PURCHASE' | 'JOB_WORK')[], title: string) => (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-white border border-slate-200">
+      <div className="rounded-2xl bg-white border border-slate-200 p-6 [container-type:inline-size]">
         <BillForm key={kinds.join()} parties={parties} kinds={kinds} partyId={partyId} onPartyChange={setParty}
           onScan={shell.openScan} onNewParty={onNewParty} />
       </div>
@@ -145,18 +147,20 @@ export const LedgerPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-3">
-      <h1 className="text-2xl font-bold text-slate-900">{t('nav_ledger')}</h1>
-      <CircularPager
-        index={index}
-        onIndexChange={setIndex}
-        hint={t('swipe_hint')}
-        views={[
-          { id: 'party', label: t('view_party'), icon: <Users className="w-5 h-5" />, render: () => partyView },
-          { id: 'sales', label: t('view_sales'), icon: <ShoppingBag className="w-5 h-5" />, render: () => billView(['SALE'], t('recent_sales')) },
-          { id: 'purchases', label: t('view_purchases'), icon: <Truck className="w-5 h-5" />, render: () => billView(['PURCHASE', 'JOB_WORK'], t('recent_purchases')) }
-        ]}
-      />
+    <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      <h1 className="shrink-0 text-2xl font-bold text-slate-900">{t('nav_ledger')}</h1>
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+        <CircularPager
+          index={index}
+          onIndexChange={setIndex}
+          hint={t('swipe_hint')}
+          views={[
+            { id: 'party', label: t('view_party'), icon: <Users className="w-5 h-5" />, render: () => partyView },
+            { id: 'sales', label: t('view_sales'), icon: <ShoppingBag className="w-5 h-5" />, render: () => billView(['SALE'], t('recent_sales')) },
+            { id: 'purchases', label: t('view_purchases'), icon: <Truck className="w-5 h-5" />, render: () => billView(['PURCHASE', 'JOB_WORK'], t('recent_purchases')) }
+          ]}
+        />
+      </div>
     </div>
   );
 };

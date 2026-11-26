@@ -42,7 +42,7 @@ export const Navbar: React.FC = () => {
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <span className="font-serif-display text-xl font-bold tracking-tight text-brand-950 block leading-tight">
+              <span className="text-xl font-bold tracking-tight text-brand-950 block leading-tight">
                 YorLedger
               </span>
               

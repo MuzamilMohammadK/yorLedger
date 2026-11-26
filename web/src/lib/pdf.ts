@@ -68,45 +68,61 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
   doc.text(showGstin ? `GSTIN: ${shop.gstin}   Ph: ${shop.phone}` : `Ph: ${shop.phone}`, nameX, y);
   doc.text(`Bill No: ${billNo}`, R, 22, { align: 'right' });
   doc.text(`Date: ${dmy(bill.invoice_date)}`, R, 27, { align: 'right' });
-  if (bill.hsn_code) {
-    doc.text(`HSN/SAC: ${bill.hsn_code}`, R, 31.5, { align: 'right' });
-  }
   y += 7;
   doc.setDrawColor(180).line(L, y, R, y);
   y += 6;
 
   // Party
-  doc.setFont('helvetica', 'bold').setFontSize(10).text(bill.type === 'SALE' ? 'Bill To' : bill.type === 'PURCHASE' ? 'Supplier' : 'Artisan', L, y);
+  doc.setFont('helvetica', 'bold').setFontSize(10).text(bill.type === 'SALE' ? 'Bill To' : bill.type === 'PURCHASE' ? 'Supplier' : 'Customer', L, y);
   doc.setFont('helvetica', 'normal').setFontSize(10);
   y += 5;
   doc.text(bill.party_name, L, y);
   y += 4.5;
   doc.setFontSize(9);
   if (party?.address) doc.splitTextToSize(String(party.address), 120).forEach((line: string) => { doc.text(line, L, y); y += 4.5; });
-  const contact = [showGstin && party?.gstin ? `GSTIN: ${party.gstin}` : '', party?.phone ? `Ph: ${party.phone}` : ''].filter(Boolean).join('   ');
+  const phone = (bill as any).customer_phone || (bill as any).party_phone || party?.phone;
+  const contact = [showGstin && party?.gstin ? `GSTIN: ${party.gstin}` : '', phone ? `Ph: ${phone}` : ''].filter(Boolean).join('   ');
   if (contact) { doc.text(contact, L, y); y += 4.5; }
   y += 4;
 
   // Items table
-  const cols = [L, L + 10, 130, 150, R];
+  const showHsnCol = bill.type !== 'JOB_WORK';
+  const cols = showHsnCol ? [L, L + 9, 98, 135, 166, R] : [L, L + 10, 130, 150, R];
   const head = () => {
     doc.setFillColor(238, 240, 250).rect(L, y - 4.5, R - L, 7, 'F');
     doc.setFont('helvetica', 'bold').setFontSize(9);
-    doc.text('#', cols[0] + 1, y); doc.text('Item', cols[1], y);
-    doc.text('Qty', cols[2], y, { align: 'right' }); doc.text('Rate', cols[3] + 12, y, { align: 'right' });
-    doc.text('Amount', cols[4] - 1, y, { align: 'right' });
+    doc.text('#', cols[0] + 1, y);
+    doc.text('Item', cols[1], y);
+    if (showHsnCol) {
+      doc.text('HSN/SAC', cols[2], y);
+      doc.text('Qty', cols[3], y, { align: 'right' });
+      doc.text('Rate', cols[4], y, { align: 'right' });
+      doc.text('Amount', cols[5] - 1, y, { align: 'right' });
+    } else {
+      doc.text('Qty', cols[2], y, { align: 'right' });
+      doc.text('Rate', cols[3] + 12, y, { align: 'right' });
+      doc.text('Amount', cols[4] - 1, y, { align: 'right' });
+    }
     doc.setFont('helvetica', 'normal');
     y += 7;
   };
   head();
   (bill.items ?? []).forEach((it, i) => {
-    const nameLines: string[] = doc.splitTextToSize(it.item_name, cols[2] - cols[1] - 14);
+    const itemMaxW = showHsnCol ? (cols[2] - cols[1] - 3) : (cols[2] - cols[1] - 14);
+    const nameLines: string[] = doc.splitTextToSize(it.item_name, itemMaxW);
     if (y + nameLines.length * 4.5 > 260) { doc.addPage(); y = 20; head(); }
     doc.text(String(i + 1), cols[0] + 1, y);
     doc.text(nameLines, cols[1], y);
-    doc.text(String(it.quantity), cols[2], y, { align: 'right' });
-    doc.text(money(it.rate_paise), cols[3] + 12, y, { align: 'right' });
-    doc.text(money(it.amount_paise), cols[4] - 1, y, { align: 'right' });
+    if (showHsnCol) {
+      doc.text(it.hsn_code || '-', cols[2], y);
+      doc.text(String(it.quantity), cols[3], y, { align: 'right' });
+      doc.text(money(it.rate_paise), cols[4], y, { align: 'right' });
+      doc.text(money(it.amount_paise), cols[5] - 1, y, { align: 'right' });
+    } else {
+      doc.text(String(it.quantity), cols[2], y, { align: 'right' });
+      doc.text(money(it.rate_paise), cols[3] + 12, y, { align: 'right' });
+      doc.text(money(it.amount_paise), cols[4] - 1, y, { align: 'right' });
+    }
     y += Math.max(1, nameLines.length) * 4.5 + 2;
   });
   doc.line(L, y - 2, R, y - 2);
@@ -119,7 +135,30 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
   else if (bill.igst_paise > 0) rows.push([`IGST @ ${pct}%`, money(bill.igst_paise)]);
   else rows.push([`CGST @ ${Number(pct) / 2}%`, money(bill.cgst_paise)], [`SGST @ ${Number(pct) / 2}%`, money(bill.sgst_paise)]);
   rows.push(['Bill total', money(bill.grand_total_paise), true]);
-  if ((bill.return_paise ?? 0) > 0) rows.push(['Less: returns', money(-(bill.return_paise ?? 0))]);
+  if ((bill.return_paise ?? 0) > 0) {
+    const retTotal = bill.return_paise ?? 0;
+    const rets = bill.returns ?? [];
+    const retGoods = rets.length
+      ? rets.reduce((s, r) => s + (r.taxable_paise ?? 0), 0)
+      : (bill.grand_total_paise > 0 ? Math.round((retTotal * bill.subtotal_paise) / bill.grand_total_paise) : retTotal);
+    const retTax = Math.max(0, retTotal - retGoods);
+    const isInterBill = bill.igst_paise > 0;
+    const retIgst = rets.length ? rets.reduce((s, r) => s + (r.igst_paise ?? 0), 0) : (isInterBill ? retTax : 0);
+    const retCgst = rets.length ? rets.reduce((s, r) => s + (r.cgst_paise ?? 0), 0) : (isInterBill ? 0 : retTax - Math.floor(retTax / 2));
+    const retSgst = rets.length ? rets.reduce((s, r) => s + (r.sgst_paise ?? 0), 0) : (isInterBill ? 0 : Math.floor(retTax / 2));
+
+    rows.push(['Less: Returned goods', money(-retGoods)]);
+    if (Number(pct) > 0 || retTax > 0) {
+      if (isInterBill) {
+        rows.push([`Less: GST on returns (IGST ${pct}%)`, money(-retIgst)]);
+      } else {
+        rows.push([`Less: CGST on returns (${Number(pct) / 2}%)`, money(-retCgst)]);
+        rows.push([`Less: SGST on returns (${Number(pct) / 2}%)`, money(-retSgst)]);
+      }
+    }
+    rows.push(['Total returned', money(-retTotal)]);
+    rows.push(['Net bill value', money(Math.max(0, bill.grand_total_paise - retTotal)), true]);
+  }
   if (bill.paid_paise > 0) rows.push(['Less: paid', money(-bill.paid_paise)]);
   if ((bill.return_paise ?? 0) > 0 || bill.paid_paise > 0) rows.push(['Balance', money(bill.pending_paise), true]);
   for (const [label, value, bold] of rows) {
@@ -128,6 +167,48 @@ function drawBill(doc: any, shop: Shop, bill: Transaction, inv: Inv) {
     doc.text(label, 140, y, { align: 'right' });
     doc.text(value, R - 1, y, { align: 'right' });
     y += bold ? 7 : 5.5;
+  }
+
+  // Optional HSN-wise summary when bill has more than one distinct HSN
+  if (showHsnCol) {
+    const distinctHsns = new Set((bill.items ?? []).map(it => it.hsn_code?.trim()).filter(Boolean));
+    if (distinctHsns.size > 1) {
+      const groups = new Map<string, number>();
+      for (const it of bill.items ?? []) {
+        const key = it.hsn_code?.trim() || '-';
+        groups.set(key, (groups.get(key) ?? 0) + (it.amount_paise || 0));
+      }
+      const totalTax = bill.cgst_paise + bill.sgst_paise + bill.igst_paise;
+      const entries = Array.from(groups.entries());
+      y += 3;
+      if (y > 245) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(0);
+      doc.text('HSN-wise Summary', L, y);
+      y += 4;
+      const hsnHead = () => {
+        doc.setFillColor(242, 244, 248).rect(L, y - 4, R - L, 6, 'F');
+        doc.setFont('helvetica', 'bold').setFontSize(8).setTextColor(50);
+        doc.text('HSN/SAC', L + 1, y);
+        doc.text('Taxable value', 145, y, { align: 'right' });
+        doc.text('Tax', R - 1, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal').setTextColor(0);
+        y += 5.5;
+      };
+      hsnHead();
+      let allocatedTax = 0;
+      entries.forEach(([hsn, taxable], idx) => {
+        if (y > 270) { doc.addPage(); y = 20; hsnHead(); }
+        const tax = idx === entries.length - 1
+          ? totalTax - allocatedTax
+          : (bill.subtotal_paise > 0 ? Math.round((totalTax * taxable) / bill.subtotal_paise) : 0);
+        allocatedTax += tax;
+        doc.setFontSize(8);
+        doc.text(hsn, L + 1, y);
+        doc.text(money(taxable), 145, y, { align: 'right' });
+        doc.text(money(tax), R - 1, y, { align: 'right' });
+        y += 4.5;
+      });
+    }
   }
 
   // Payment Details table (§3)

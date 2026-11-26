@@ -1,6 +1,8 @@
 import React from 'react';
 import { ArtisanJobWorkReport, formatINR } from '@yorbalance/shared';
 import { Scissors } from 'lucide-react';
+import { useI18n } from '../../i18n';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface JobWorkLedgerTableProps {
   report: ArtisanJobWorkReport | null;
@@ -8,6 +10,7 @@ interface JobWorkLedgerTableProps {
 }
 
 export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, loading = false }) => {
+  const { fmtDate } = useI18n();
   if (loading) {
     return (
       <div className="bg-white rounded-3xl p-6 border border-slate-200 animate-pulse space-y-4">
@@ -23,7 +26,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
         <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
           <Scissors className="w-6 h-6" />
         </div>
-        <h3 className="font-serif-display text-base font-bold text-slate-800">No Job-Work Transactions</h3>
+        <h3 className="tabular-nums text-base font-bold text-slate-800">No Job-Work Transactions</h3>
         <p className="text-sm text-slate-500 max-w-sm mx-auto">
           There are no artisan weaving, dyeing, zari or embroidery job-work transactions in this period.
         </p>
@@ -39,7 +42,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-slate-400 block">Total Job Work Value</span>
-          <span className="font-serif-display text-base font-bold text-slate-900 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-slate-900 block mt-0.5">
             {formatINR(totals.total_job_work_value, true)}
           </span>
           <span className="text-sm text-slate-500">{items.length} Work Orders</span>
@@ -63,7 +66,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
           <span className="text-sm font-bold uppercase tracking-wider text-rose-500 block">Pending Artisan Dues</span>
-          <span className="font-serif-display text-base font-bold text-rose-600 block mt-0.5">
+          <span className="tabular-nums text-base font-bold text-rose-600 block mt-0.5">
             {formatINR(totals.total_outstanding, true)}
           </span>
           <span className="text-sm text-rose-500/80 font-medium">{artisan_summaries.length} Active Artisans</span>
@@ -72,7 +75,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
 
       {/* Artisan-Wise Breakdown Cards */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
-        <h3 className="font-serif-display text-sm font-bold text-slate-900">Artisan Production & Dues Summary</h3>
+        <h3 className="tabular-nums text-sm font-bold text-slate-900">Artisan Production & Dues Summary</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {artisan_summaries.map(art => (
             <div key={art.artisan_id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
@@ -108,7 +111,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
       <div className="hidden md:block bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="font-serif-display text-sm font-bold text-slate-900">Job-Work Transaction Register</h3>
+            <h3 className="tabular-nums text-sm font-bold text-slate-900">Job-Work Transaction Register</h3>
             <p className="text-sm text-slate-500">Itemized work descriptions, fabric quantities, labor charges, and dues.</p>
           </div>
           <span className="text-sm font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
@@ -138,8 +141,8 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
                     <span className="font-semibold text-slate-900 block font-mono">
                       {item.job_work_reference || 'N/A'}
                     </span>
-                    <span className="text-sm text-slate-400">
-                      {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <span className="text-sm text-slate-400 tabular-nums">
+                      {fmtDate(item.transaction_date)}
                     </span>
                   </td>
                   <td className="py-3 px-4">
@@ -167,19 +170,7 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
                     {item.outstanding_amount > 0 ? formatINR(item.outstanding_amount, true) : '—'}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                        item.payment_status === 'SETTLED'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : item.payment_status === 'PARTIAL'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : item.payment_status === 'OVERDUE'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {item.payment_status}
-                    </span>
+                    <StatusBadge status={item.payment_status} />
                   </td>
                 </tr>
               ))}
@@ -205,23 +196,11 @@ export const JobWorkLedgerTable: React.FC<JobWorkLedgerTableProps> = ({ report, 
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="font-mono font-bold text-sm text-slate-900 block">{item.job_work_reference || 'N/A'}</span>
-                <span className="text-sm text-slate-400">
-                  {new Date(item.transaction_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                <span className="text-sm text-slate-400 tabular-nums">
+                  {fmtDate(item.transaction_date)}
                 </span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-sm font-bold uppercase tracking-wider ${
-                  item.payment_status === 'SETTLED'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : item.payment_status === 'PARTIAL'
-                    ? 'bg-amber-50 text-amber-700'
-                    : item.payment_status === 'OVERDUE'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
-              >
-                {item.payment_status}
-              </span>
+              <StatusBadge status={item.payment_status} />
             </div>
 
             <div className="pt-1 border-t border-slate-100">

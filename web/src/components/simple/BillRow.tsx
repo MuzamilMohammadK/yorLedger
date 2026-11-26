@@ -3,6 +3,7 @@ import { ShoppingBag, Truck, Scissors, IndianRupee, Undo2, ChevronDown, ChevronU
 import { formatPaiseToINR, PaymentRecord } from '@yorbalance/shared';
 import { useI18n } from '../../i18n';
 import { todayIST } from '../../lib/data/util';
+import { StatusBadge } from '../ui/StatusBadge';
 
 export interface BillRowData {
   id: string;
@@ -81,17 +82,14 @@ export const BillRow: React.FC<{
             <span className="block text-base font-bold text-slate-900 truncate">{bill.party_name}</span>
             <span className="block text-sm text-slate-500 truncate">
               {t(`kind_${bill.type}` as any)} · #{bill.invoice_number} · {fmtDate(bill.invoice_date)}
+              {bill.type === 'JOB_WORK' && ` · ${((bill as any).items || []).reduce((sum: number, it: any) => sum + (it.quantity || 0), 0)} sarees`}
             </span>
           </span>
           <span className="text-right shrink-0">
             <span className="block text-base font-bold text-slate-900">
               {rs(isBill && st !== 'SETTLED' ? remainingPaise : bill.grand_total_paise)}
             </span>
-            {isBill && (
-              <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-xs font-bold ${BADGE[st]}`}>
-                {t(`status_${st}` as any)}
-              </span>
-            )}
+            {isBill && <StatusBadge status={st} className="mt-0.5" />}
           </span>
         </button>
 

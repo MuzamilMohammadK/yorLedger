@@ -23,7 +23,7 @@ export const NewTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSucces
   const { t } = useI18n();
   if (!isOpen) return null;
   return (
-    <Sheet title={t('new_bill')} onClose={onClose}>
+    <Sheet title={t('new_bill')} onClose={onClose} size="bill">
       {/* key: a fresh form each time the sheet opens */}
       <BillForm
         key={`${preselectedPartyId ?? ''}-${draft ? JSON.stringify(draft).length : 0}`}

@@ -123,7 +123,7 @@ function resolveReportDateRange(options?: ReportFilterOptions): { from: string; 
 }
 
 function enrichClientPartyWithBalance(party: Party, transactions: Transaction[]): Party {
-  const partyTxs = transactions.filter(t => t.party_id === party.id);
+  const partyTxs = transactions.filter(t => t.party_id === party.id && t.type !== 'JOB_WORK');
   const totalPendingPaise = partyTxs.reduce((sum, t) => sum + (t.pending_paise || 0), 0);
   const amountRupees = Math.round(totalPendingPaise / 100);
 
@@ -242,9 +242,13 @@ export const compute = {
       const allPhones = [p.phone, ...(p.additional_phones || [])].join(' ');
       partyPhoneMap.set(p.id, allPhones);
     });
+    cache.weavers().forEach(w => {
+      const allPhones = [w.phone, ...(w.additional_phones || [])].join(' ');
+      partyPhoneMap.set(w.id, allPhones);
+    });
 
     if (options?.partyId) {
-      txs = txs.filter(t => t.party_id === options.partyId);
+      txs = txs.filter(t => t.party_id === options.partyId && t.type !== 'JOB_WORK');
     }
 
     if (options?.type && options.type !== 'ALL') {
@@ -303,6 +307,10 @@ export const compute = {
     parties.forEach(p => {
       const allPhones = [p.phone, ...(p.additional_phones || [])].join(' ');
       partyPhoneMap.set(p.id, allPhones);
+    });
+    cache.weavers().forEach(w => {
+      const allPhones = [w.phone, ...(w.additional_phones || [])].join(' ');
+      partyPhoneMap.set(w.id, allPhones);
     });
 
     const filterByDate = (dateStr: string) => {
@@ -462,8 +470,11 @@ export const compute = {
       })));
     }
 
-    if (!options?.type || options.type === 'ALL' || options.type === 'RETURN') {
-      items.push(...returns.map(r => {
+    if (options?.type === 'RETURN' || !options?.type || options.type === 'ALL') {
+      // In the "ALL" tab, bill-linked returns are grouped under their parent bill dropdown.
+      // Only show returns as separate rows in the "RETURN" tab (or if unlinked).
+      const list = options?.type === 'RETURN' ? returns : returns.filter(r => !r.transaction_id);
+      items.push(...list.map(r => {
         const parentTx = txs.find(t => t.id === r.transaction_id);
         return {
           id: r.id,
@@ -499,7 +510,7 @@ export const compute = {
     if (options?.search && options.search.trim()) {
       const q = options.search.trim().toLowerCase();
       items = items.filter(it => {
-        const phones = partyPhoneMap.get(it.party_id) || '';
+        const phones = [it.party_phone, it.customer_phone, partyPhoneMap.get(it.party_id) || ''].filter(Boolean).join(' ');
         return (
           (it.party_name && it.party_name.toLowerCase().includes(q)) ||
           (it.invoice_number && it.invoice_number.toLowerCase().includes(q)) ||
@@ -607,6 +618,10 @@ export const compute = {
     parties.forEach(p => {
       const allPhones = [p.phone, ...(p.additional_phones || [])].join(' ');
       partyPhoneMap.set(p.id, allPhones);
+    });
+    cache.weavers().forEach(w => {
+      const allPhones = [w.phone, ...(w.additional_phones || [])].join(' ');
+      partyPhoneMap.set(w.id, allPhones);
     });
 
     const duesList: DueRecord[] = [];
@@ -905,19 +920,77 @@ export const compute = {
 
     items.sort((a, b) => b.bill_date.localeCompare(a.bill_date));
 
+    // Sales returns / credit notes in the selected period reduce taxable sales and output GST.
+    const allSaleBills = txs.filter(t => t.type === 'SALE');
+    const saleBillMap = new Map(allSaleBills.map(b => [b.id, b]));
+    const periodReturns = loadReturns(shopId).filter(r => {
+      if (r.return_date < dateRange.from || r.return_date > dateRange.to) return false;
+      const bill = saleBillMap.get(r.transaction_id);
+      if (!bill) return false;
+      if (options?.partyId && bill.party_id !== options.partyId) return false;
+      if (options?.partySearch && options.partySearch.trim()) {
+        const q = options.partySearch.trim().toLowerCase();
+        if (!bill.party_name.toLowerCase().includes(q) && !bill.invoice_number.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+
+    let return_taxable = 0;
+    let return_cgst = 0;
+    let return_sgst = 0;
+    let return_igst = 0;
+    let total_returns = 0;
+    const sales_returns = periodReturns.map(r => {
+      const bill = saleBillMap.get(r.transaction_id)!;
+      const taxable_value = Math.round((r.taxable_paise ?? r.amount_paise) / 100);
+      const cgst = Math.round((r.cgst_paise ?? 0) / 100);
+      const sgst = Math.round((r.sgst_paise ?? 0) / 100);
+      const igst = Math.round((r.igst_paise ?? 0) / 100);
+      const total_gst = cgst + sgst + igst;
+      const total_amount = Math.round(r.amount_paise / 100);
+      return_taxable += taxable_value;
+      return_cgst += cgst;
+      return_sgst += sgst;
+      return_igst += igst;
+      total_returns += total_amount;
+      return {
+        id: r.id,
+        bill_id: bill.id,
+        invoice_number: bill.invoice_number,
+        customer_name: bill.party_name,
+        return_date: r.return_date,
+        reason: r.reason ?? null,
+        taxable_value,
+        cgst,
+        sgst,
+        igst,
+        total_gst,
+        total_amount
+      };
+    }).sort((a, b) => b.return_date.localeCompare(a.return_date));
+
+    const return_gst = return_cgst + return_sgst + return_igst;
+
     return {
       items,
+      sales_returns,
       totals: {
-        total_taxable_sales,
-        total_cgst,
-        total_sgst,
-        total_igst,
-        total_output_gst,
-        total_sales_value,
+        total_taxable_sales: Math.max(0, total_taxable_sales - return_taxable),
+        total_cgst: Math.max(0, total_cgst - return_cgst),
+        total_sgst: Math.max(0, total_sgst - return_sgst),
+        total_igst: Math.max(0, total_igst - return_igst),
+        total_output_gst: Math.max(0, total_output_gst - return_gst),
+        total_sales_value: Math.max(0, total_sales_value - total_returns),
         total_paid,
         total_outstanding_due,
         intra_state_sales,
-        inter_state_sales
+        inter_state_sales,
+        return_taxable,
+        return_cgst,
+        return_sgst,
+        return_igst,
+        return_gst,
+        total_returns
       },
       period: { from: dateRange.from, to: dateRange.to, label: dateRange.label }
     };
@@ -1028,14 +1101,24 @@ export const compute = {
       output_cgst: salesReport.totals.total_cgst,
       output_sgst: salesReport.totals.total_sgst,
       output_igst: salesReport.totals.total_igst,
+      gross_output_cgst: salesReport.totals.total_cgst + (salesReport.totals.return_cgst ?? 0),
+      gross_output_sgst: salesReport.totals.total_sgst + (salesReport.totals.return_sgst ?? 0),
+      gross_output_igst: salesReport.totals.total_igst + (salesReport.totals.return_igst ?? 0),
+      return_cgst: salesReport.totals.return_cgst ?? 0,
+      return_sgst: salesReport.totals.return_sgst ?? 0,
+      return_igst: salesReport.totals.return_igst ?? 0,
       input_cgst: purchaseReport.totals.total_cgst,
       input_sgst: purchaseReport.totals.total_sgst,
       input_igst: purchaseReport.totals.total_igst
     };
 
+    const salesReturns = salesReport.sales_returns ?? [];
     const monthsSet = new Set<string>();
     salesReport.items.forEach(it => {
       if (it.bill_date) monthsSet.add(it.bill_date.slice(0, 7));
+    });
+    salesReturns.forEach(r => {
+      if (r.return_date) monthsSet.add(r.return_date.slice(0, 7));
     });
     purchaseReport.items.forEach(it => {
       if (it.bill_date) monthsSet.add(it.bill_date.slice(0, 7));
@@ -1048,16 +1131,18 @@ export const compute = {
     }
 
     const monthly_sales_vs_purchases = sortedMonths.map(m => {
-      const s = salesReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.grand_total, 0);
+      const grossS = salesReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.grand_total, 0);
+      const retS = salesReturns.filter(r => r.return_date.startsWith(m)).reduce((sum, r) => sum + r.total_amount, 0);
       const p = purchaseReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.net_purchase_amount, 0);
-      return { month: m, sales: s, purchases: p };
+      return { month: m, sales: Math.max(0, grossS - retS), purchases: p };
     });
 
     const monthly_output_gst_trend = sortedMonths.map(m => {
       const sItems = salesReport.items.filter(it => it.bill_date.startsWith(m));
-      const cgst = sItems.reduce((sum, it) => sum + it.cgst, 0);
-      const sgst = sItems.reduce((sum, it) => sum + it.sgst, 0);
-      const igst = sItems.reduce((sum, it) => sum + it.igst, 0);
+      const rItems = salesReturns.filter(r => r.return_date.startsWith(m));
+      const cgst = Math.max(0, sItems.reduce((sum, it) => sum + it.cgst, 0) - rItems.reduce((sum, r) => sum + r.cgst, 0));
+      const sgst = Math.max(0, sItems.reduce((sum, it) => sum + it.sgst, 0) - rItems.reduce((sum, r) => sum + r.sgst, 0));
+      const igst = Math.max(0, sItems.reduce((sum, it) => sum + it.igst, 0) - rItems.reduce((sum, r) => sum + r.igst, 0));
       return { month: m, output_gst: cgst + sgst + igst, cgst, sgst, igst };
     });
 
@@ -1073,7 +1158,9 @@ export const compute = {
     ];
 
     const monthly_net_payable_trend = sortedMonths.map(m => {
-      const outTax = salesReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.total_gst, 0);
+      const outGross = salesReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.total_gst, 0);
+      const outRet = salesReturns.filter(r => r.return_date.startsWith(m)).reduce((sum, r) => sum + r.total_gst, 0);
+      const outTax = Math.max(0, outGross - outRet);
       const inItc = purchaseReport.items.filter(it => it.bill_date.startsWith(m)).reduce((sum, it) => sum + it.eligible_itc, 0);
       return { month: m, net_payable: Math.max(0, outTax - inItc) };
     });
@@ -1186,7 +1273,8 @@ export const compute = {
       sold: number;
       sent_to_polish: number;
       received_from_polish: number;
-      returned: number;
+      sale_returned: number;
+      purchase_returned: number;
       unit_price_paise: number;
     }>();
 
@@ -1203,53 +1291,88 @@ export const compute = {
           sold: 0,
           sent_to_polish: 0,
           received_from_polish: 0,
-          returned: 0,
+          sale_returned: 0,
+          purchase_returned: 0,
           unit_price_paise: 0
         });
       }
       return itemMap.get(key)!;
     };
 
-    // 1. Stock movements (Opening balances & manual adjustments)
-    for (const sm of cache.stockMovements()) {
+    // Track which bills/returns already have explicit stockMovements rows to avoid double counting.
+    const activeMovements = cache.rawStockMovements().filter(sm => sm.status !== 'VOID');
+    const billHasMovements = new Set<string>();
+    const returnHasMovements = new Set<string>();
+    for (const sm of activeMovements) {
+      if (sm.bill_id && (sm.kind === 'SALE' || sm.kind === 'PURCHASE')) billHasMovements.add(sm.bill_id);
+      if (sm.bill_id && (sm.kind === 'SALE_RETURN' || sm.kind === 'PURCHASE_RETURN')) returnHasMovements.add(sm.bill_id);
+    }
+
+    // 1. Unified stock movements (opening, production, adjustments, and bill/return-linked movements)
+    for (const sm of activeMovements) {
+      if (sm.kind === 'COUNT_SNAPSHOT' || sm.source_type === 'WEAVER_RECEIVE') continue;
+      if (sm.kind === 'POLISH_OUT' || sm.kind === 'POLISH_IN') continue;
       const entry = getOrInit(sm.item_name);
       if (!entry) continue;
-      if (sm.movement_type === 'OPENING') {
-        entry.opening += sm.qty;
-      } else if (sm.movement_type === 'PRODUCTION') {
-        entry.produced += sm.qty;
-      } else if (sm.movement_type === 'RETURN') {
-        entry.returned += sm.qty;
+      const qty = Number(sm.qty) || 0;
+      const mt = sm.kind || sm.movement_type;
+      if (mt === 'OPENING' || mt === 'ADJUSTMENT' || mt === 'COUNT_ADJUST') {
+        entry.opening += qty;
+      } else if (mt === 'PRODUCTION') {
+        entry.produced += qty;
+      } else if (mt === 'PURCHASE') {
+        entry.purchased += Math.abs(qty);
+      } else if (mt === 'SALE') {
+        entry.sold += Math.abs(qty);
+      } else if (mt === 'SALE_RETURN' || mt === 'RETURN') {
+        entry.sale_returned += Math.abs(qty);
+      } else if (mt === 'PURCHASE_RETURN') {
+        entry.purchase_returned += Math.abs(qty);
       }
       if (sm.rate_paise && sm.rate_paise > 0) {
-        entry.unit_price_paise = sm.rate_paise;
+        entry.unit_price_paise = Number(sm.rate_paise);
       }
     }
 
-    // 2. Bills (Purchases & Sales)
+    // 2. Legacy bills without explicit stockMovements (Purchases & Sales — matches Tally)
     for (const b of cache.rawBills()) {
       const isPurchase = b.kind === 'PURCHASE';
       const isSale = b.kind === 'SALE';
       if (!isPurchase && !isSale) continue;
 
+      const skipQty = billHasMovements.has(b.id);
       for (const it of (b.items || [])) {
         const entry = getOrInit(it.name);
         if (!entry) continue;
         const qty = Number(it.qty) || 0;
-        if (isPurchase) {
-          entry.purchased += qty;
-          if (it.rate && it.rate > 0) entry.unit_price_paise = it.rate;
-        } else if (isSale) {
-          entry.sold += qty;
-          if (!entry.unit_price_paise && it.rate && it.rate > 0) {
-            entry.unit_price_paise = it.rate;
-          }
+        if (!skipQty) {
+          if (isPurchase) entry.purchased += qty;
+          else if (isSale) entry.sold += qty;
+        }
+        if (isPurchase && it.rate && it.rate > 0) entry.unit_price_paise = it.rate;
+        else if (isSale && !entry.unit_price_paise && it.rate && it.rate > 0) {
+          entry.unit_price_paise = it.rate;
         }
       }
     }
 
-    // 3. Weaver receipts (Produced finished sarees)
+    // 3. Legacy returns without explicit stockMovements (fixes 9,136 vs 9,000 mismatch)
+    for (const r of cache.returns()) {
+      if (returnHasMovements.has(r.transaction_id)) continue;
+      const bill = cache.rawBill(r.transaction_id);
+      if (!bill || (bill.kind !== 'SALE' && bill.kind !== 'PURCHASE')) continue;
+      for (const it of (r.items || [])) {
+        const entry = getOrInit(it.name);
+        if (!entry) continue;
+        const qty = Number(it.qty) || 0;
+        if (bill.kind === 'SALE') entry.sale_returned += qty;
+        else if (bill.kind === 'PURCHASE') entry.purchase_returned += qty;
+      }
+    }
+
+    // 4. Weaver receipts (Produced finished sarees)
     for (const tx of cache.weaverTx()) {
+      if ((tx as any).status === 'VOID') continue;
       if (tx.action_type === 'RECEIVE' && tx.sarees_count) {
         const name = tx.finished_item_name || 'Silk Saree';
         const entry = getOrInit(name);
@@ -1259,19 +1382,22 @@ export const compute = {
       }
     }
 
-    // 4. Polishing batches
-    for (const p of cache.polishing()) {
+    // 5. Polishing batches
+    for (const p of cache.rawPolishing()) {
+      if (p.record_status === 'VOID' || p.entry_kind === 'PAYMENT') continue;
       const name = p.item_name || 'Silk Saree';
       const entry = getOrInit(name);
       if (entry) {
-        entry.sent_to_polish += p.sarees_sent || 0;
-        entry.received_from_polish += p.sarees_received || 0;
+        entry.sent_to_polish += Number(p.sarees_sent) || 0;
+        entry.received_from_polish += Number(p.sarees_received) || 0;
       }
     }
 
     const items: StockItemSummary[] = Array.from(itemMap.values()).map(it => {
-      const closing = it.opening + it.purchased + it.produced - it.sold + it.returned;
-      const inPolish = Math.max(0, it.sent_to_polish - it.received_from_polish);
+      const returned = it.sale_returned - it.purchase_returned;
+      const closing = it.opening + it.purchased + it.produced - it.sold + returned;
+      const inPolishRaw = it.sent_to_polish - it.received_from_polish;
+      const inPolish = Math.max(0, inPolishRaw);
       const inHand = closing - inPolish;
       const threshold = 5;
       return {
@@ -1282,7 +1408,7 @@ export const compute = {
         sold: it.sold,
         sent_to_polish: it.sent_to_polish,
         received_from_polish: it.received_from_polish,
-        returned: it.returned,
+        returned,
         closing_balance: closing,
         in_hand_balance: inHand,
         low_stock_threshold: threshold,
@@ -1299,52 +1425,130 @@ export const compute = {
     return items.sort((a, b) => a.item_name.localeCompare(b.item_name));
   },
 
-  getItemLedger(shopId: string, itemName: string) {
+  getItemLedger(shopId: string, itemName: string, includeVoided = false) {
     const targetKey = itemName.trim().toLowerCase();
     const rows: Array<{
       id: string;
       date: string;
-      type: 'OPENING' | 'PURCHASE' | 'PRODUCTION' | 'SALE' | 'POLISH_SENT' | 'POLISH_RECEIVED' | 'RETURN';
+      type: 'OPENING' | 'PURCHASE' | 'PRODUCTION' | 'SALE' | 'POLISH_SENT' | 'POLISH_RECEIVED' | 'RETURN' | 'ADJUSTMENT';
       ref_no: string;
       party_name: string;
       qty_in: number;
       qty_out: number;
       running_balance: number;
       notes?: string | null;
+      status: 'ACTIVE' | 'VOID';
+      void_reason?: string | null;
+      source_bill_id?: string | null;
+      can_edit?: boolean;
+      can_void?: boolean;
     }> = [];
 
-    // Opening / manual movements
-    for (const sm of cache.stockMovements()) {
-      if (sm.item_name.trim().toLowerCase() !== targetKey) continue;
-      if (sm.movement_type === 'OPENING') {
-        rows.push({
-          id: sm.id,
-          date: sm.date,
-          type: 'OPENING',
-          ref_no: 'OPN',
-          party_name: 'Opening Stock',
-          qty_in: sm.qty,
-          qty_out: 0,
-          running_balance: 0,
-          notes: sm.notes
-        });
-      } else if (sm.movement_type === 'PRODUCTION') {
-        rows.push({
-          id: sm.id,
-          date: sm.date,
-          type: 'PRODUCTION',
-          ref_no: 'PRD',
-          party_name: 'Production',
-          qty_in: sm.qty,
-          qty_out: 0,
-          running_balance: 0,
-          notes: sm.notes
-        });
-      }
+    const activeMovements = cache.rawStockMovements().filter(sm => sm.status !== 'VOID');
+    const billHasMovements = new Set<string>();
+    const returnHasMovements = new Set<string>();
+    for (const sm of activeMovements) {
+      if (sm.bill_id && (sm.kind === 'SALE' || sm.kind === 'PURCHASE')) billHasMovements.add(sm.bill_id);
+      if (sm.bill_id && (sm.kind === 'SALE_RETURN' || sm.kind === 'PURCHASE_RETURN')) returnHasMovements.add(sm.bill_id);
     }
 
-    // Bills
+    // 1. Stock movements (manual + bill/return-linked)
+    for (const sm of cache.rawStockMovements()) {
+      if (String(sm.item_name ?? '').trim().toLowerCase() !== targetKey) continue;
+      if (sm.kind === 'COUNT_SNAPSHOT' || sm.source_type === 'WEAVER_RECEIVE') continue;
+      if (sm.kind === 'POLISH_OUT' || sm.kind === 'POLISH_IN') continue;
+      const st: 'ACTIVE' | 'VOID' = sm.status === 'VOID' ? 'VOID' : 'ACTIVE';
+      if (!includeVoided && st === 'VOID') continue;
+      const qty = Number(sm.qty) || 0;
+      const mt = sm.kind || sm.movement_type;
+      const bill = sm.bill_id ? cache.rawBill(sm.bill_id) : undefined;
+      const billRefNo = sm.ref_no || (bill ? (bill.invoice_prefix ? `${bill.invoice_prefix}${bill.invoice_no}` : String(bill.invoice_no)) : '');
+      const party = sm.party_id ? cache.rawParty(sm.party_id) : undefined;
+      const partyName = sm.party_name || party?.name || bill?.party_name || '';
+
+      if (mt === 'PURCHASE') {
+        rows.push({
+          id: sm.id,
+          date: String(sm.date ?? ''),
+          type: 'PURCHASE',
+          ref_no: billRefNo ? `Purchase ${billRefNo}` : 'Purchase',
+          party_name: partyName || 'Supplier',
+          qty_in: Math.abs(qty),
+          qty_out: 0,
+          running_balance: 0,
+          notes: sm.notes ?? null,
+          status: st,
+          void_reason: sm.void_reason ?? null,
+          source_bill_id: sm.bill_id ?? null,
+          can_edit: false,
+          can_void: false
+        });
+        continue;
+      }
+      if (mt === 'SALE') {
+        rows.push({
+          id: sm.id,
+          date: String(sm.date ?? ''),
+          type: 'SALE',
+          ref_no: billRefNo ? `Sale ${billRefNo}` : 'Sale',
+          party_name: partyName || 'Customer',
+          qty_in: 0,
+          qty_out: Math.abs(qty),
+          running_balance: 0,
+          notes: sm.notes ?? null,
+          status: st,
+          void_reason: sm.void_reason ?? null,
+          source_bill_id: sm.bill_id ?? null,
+          can_edit: false,
+          can_void: false
+        });
+        continue;
+      }
+      if (mt === 'SALE_RETURN' || mt === 'PURCHASE_RETURN') {
+        const isSaleRet = mt === 'SALE_RETURN';
+        rows.push({
+          id: sm.id,
+          date: String(sm.date ?? ''),
+          type: 'RETURN',
+          ref_no: billRefNo ? `${isSaleRet ? 'Sale' : 'Purchase'} Return ${billRefNo}` : 'Return',
+          party_name: partyName || (isSaleRet ? 'Customer Return' : 'Supplier Return'),
+          qty_in: isSaleRet ? Math.abs(qty) : 0,
+          qty_out: isSaleRet ? 0 : Math.abs(qty),
+          running_balance: 0,
+          notes: sm.notes ?? null,
+          status: st,
+          void_reason: sm.void_reason ?? null,
+          source_bill_id: sm.bill_id ?? null,
+          can_edit: false,
+          can_void: false
+        });
+        continue;
+      }
+
+      const rowType =
+        mt === 'OPENING' ? 'OPENING' :
+          mt === 'PRODUCTION' ? 'PRODUCTION' :
+            mt === 'RETURN' ? 'RETURN' : 'ADJUSTMENT';
+      rows.push({
+        id: sm.id,
+        date: String(sm.date ?? ''),
+        type: rowType,
+        ref_no: mt === 'OPENING' ? 'OPN' : mt === 'PRODUCTION' ? 'PRD' : 'ADJ',
+        party_name: mt === 'OPENING' ? 'Opening Stock' : mt === 'PRODUCTION' ? 'Manual Production' : 'Stock Adjustment',
+        qty_in: qty > 0 ? qty : 0,
+        qty_out: qty < 0 ? Math.abs(qty) : 0,
+        running_balance: 0,
+        notes: sm.notes ?? null,
+        status: st,
+        void_reason: sm.void_reason ?? null,
+        can_edit: st === 'ACTIVE',
+        can_void: st === 'ACTIVE'
+      });
+    }
+
+    // 2. Legacy bills without explicit stockMovements
     for (const b of cache.rawBills()) {
+      if (billHasMovements.has(b.id)) continue;
       const isPurchase = b.kind === 'PURCHASE';
       const isSale = b.kind === 'SALE';
       if (!isPurchase && !isSale) continue;
@@ -1361,24 +1565,57 @@ export const compute = {
             id: `${b.id}-${it.name}`,
             date: b.bill_date,
             type: 'PURCHASE',
-            ref_no: refNo,
+            ref_no: `Purchase ${refNo}`,
             party_name: partyName,
             qty_in: qty,
             qty_out: 0,
-            running_balance: 0
+            running_balance: 0,
+            status: 'ACTIVE',
+            source_bill_id: b.id
           });
         } else if (isSale) {
           rows.push({
             id: `${b.id}-${it.name}`,
             date: b.bill_date,
             type: 'SALE',
-            ref_no: refNo,
+            ref_no: `Sale ${refNo}`,
             party_name: partyName,
             qty_in: 0,
             qty_out: qty,
-            running_balance: 0
+            running_balance: 0,
+            status: 'ACTIVE',
+            source_bill_id: b.id
           });
         }
+      }
+    }
+
+    // 3. Legacy returns without explicit stockMovements
+    for (const r of cache.returns()) {
+      if (returnHasMovements.has(r.transaction_id)) continue;
+      const bill = cache.rawBill(r.transaction_id);
+      if (!bill || (bill.kind !== 'SALE' && bill.kind !== 'PURCHASE')) continue;
+      const p = cache.rawParty(r.party_id);
+      const partyName = p?.name ?? bill.party_name ?? 'Party';
+      const refNo = bill.invoice_prefix ? `${bill.invoice_prefix}${bill.invoice_no}` : String(bill.invoice_no);
+
+      for (const it of (r.items || [])) {
+        if ((it.name || '').trim().toLowerCase() !== targetKey) continue;
+        const qty = Number(it.qty) || 0;
+        const isSaleRet = bill.kind === 'SALE';
+        rows.push({
+          id: `${r.id}-${it.name}`,
+          date: r.return_date,
+          type: 'RETURN',
+          ref_no: `${isSaleRet ? 'Sale' : 'Purchase'} Return ${refNo}`,
+          party_name: partyName,
+          qty_in: isSaleRet ? qty : 0,
+          qty_out: isSaleRet ? 0 : qty,
+          running_balance: 0,
+          notes: r.reason ?? null,
+          status: 'ACTIVE',
+          source_bill_id: bill.id
+        });
       }
     }
 
@@ -1396,39 +1633,43 @@ export const compute = {
           qty_in: tx.sarees_count,
           qty_out: 0,
           running_balance: 0,
-          notes: tx.notes
+          notes: tx.notes,
+          status: 'ACTIVE'
         });
       }
     }
 
     // Polishing
-    for (const pol of cache.polishing()) {
-      const itName = pol.item_name || 'Silk Saree';
+    for (const pol of cache.rawPolishing()) {
+      if (pol.record_status === 'VOID' || pol.entry_kind === 'PAYMENT') continue;
+      const itName = String(pol.item_name || 'Silk Saree');
       if (itName.trim().toLowerCase() !== targetKey) continue;
-      if (pol.sarees_sent > 0) {
+      if (Number(pol.sarees_sent) > 0) {
         rows.push({
           id: `${pol.id}-sent`,
-          date: pol.sent_date,
+          date: String(pol.sent_date ?? ''),
           type: 'POLISH_SENT',
           ref_no: `POL-${pol.person_name}`,
           party_name: `Polishing: ${pol.person_name}`,
           qty_in: 0,
-          qty_out: pol.sarees_sent,
+          qty_out: Number(pol.sarees_sent),
           running_balance: 0,
-          notes: pol.notes
+          notes: pol.notes ?? null,
+          status: 'ACTIVE'
         });
       }
-      if (pol.sarees_received > 0) {
+      if (Number(pol.sarees_received) > 0) {
         rows.push({
           id: `${pol.id}-recv`,
-          date: pol.received_date || pol.sent_date,
+          date: String(pol.received_date || pol.sent_date || ''),
           type: 'POLISH_RECEIVED',
           ref_no: `POL-${pol.person_name}`,
           party_name: `Polishing: ${pol.person_name}`,
-          qty_in: pol.sarees_received,
+          qty_in: Number(pol.sarees_received),
           qty_out: 0,
           running_balance: 0,
-          notes: pol.notes
+          notes: pol.notes ?? null,
+          status: 'ACTIVE'
         });
       }
     }
@@ -1436,10 +1677,12 @@ export const compute = {
     // Sort chronologically ascending
     rows.sort((a, b) => a.date.localeCompare(b.date));
 
-    // Calculate running balance
+    // Calculate running balance across ACTIVE rows only
     let running = 0;
     for (const r of rows) {
-      running += (r.qty_in - r.qty_out);
+      if (r.status === 'ACTIVE') {
+        running = running + r.qty_in - r.qty_out;
+      }
       r.running_balance = running;
     }
 
@@ -1455,20 +1698,28 @@ export const compute = {
       let issued_kg = 0;
       let returned_kg = 0;
       let wastage_kg = 0;
+      let sold_kg = 0;
+      let purchaseValuePaise = 0;
 
       for (const tx of txs) {
         if (tx.material_id !== m.id) continue;
-        if (tx.tx_type === 'PURCHASE') purchased_kg += tx.qty_kg;
-        else if (tx.tx_type === 'ISSUE_WEAVER') issued_kg += tx.qty_kg;
+        if ((tx as any).status === 'VOID') continue;
+        if (tx.tx_type === 'PURCHASE') {
+          purchased_kg += tx.qty_kg;
+          purchaseValuePaise += Math.round(tx.qty_kg * tx.rate_per_kg_paise);
+        } else if (tx.tx_type === 'ISSUE_WEAVER') issued_kg += tx.qty_kg;
         else if (tx.tx_type === 'RETURN') returned_kg += tx.qty_kg;
         else if (tx.tx_type === 'WASTAGE') wastage_kg += tx.qty_kg;
+        else if ((tx.tx_type as string) === 'SOLD') sold_kg += tx.qty_kg;
       }
 
-      const balance_kg = Math.max(0, purchased_kg + returned_kg - issued_kg - wastage_kg);
-      const stock_value_paise = Math.round(balance_kg * m.unit_price_paise);
+      // Never clamp: negative stock is shown in red with a warning
+      const balance_kg = purchased_kg + returned_kg - issued_kg - wastage_kg - sold_kg;
+      const weightedRate = purchased_kg > 0 ? Math.round(purchaseValuePaise / purchased_kg) : m.unit_price_paise;
+      const stock_value_paise = Math.round(balance_kg * weightedRate);
 
       return {
-        material: m,
+        material: { ...m, unit_price_paise: weightedRate },
         purchased_kg,
         issued_kg,
         returned_kg,
@@ -1492,6 +1743,7 @@ export const compute = {
       let wages_earned_paise = 0;
       let wages_paid_paise = 0;
 
+      // Transactions recorded in weaverTx (e.g. yarn issues, receipts, direct wage payments)
       for (const tx of txs) {
         if (tx.weaver_id !== w.id) continue;
         if (tx.action_type === 'ISSUE') {
@@ -1645,12 +1897,19 @@ export const compute = {
         if (!b.bill_date.startsWith(m)) continue;
         const count = (b.items || []).reduce((sum: number, it: any) => sum + (Number(it.qty) || 0), 0);
         if (b.kind === 'PURCHASE') purchased += count;
-        else if (b.kind === 'SALE') sold += count;
+        else if (b.kind === 'SALE' || b.kind === 'JOB_WORK') sold += count;
       }
 
       for (const tx of cache.weaverTx()) {
+        if ((tx as any).status === 'VOID') continue;
         if (tx.action_type === 'RECEIVE' && tx.date.startsWith(m)) {
           produced += (tx.sarees_count || 0);
+        }
+      }
+      for (const sm of cache.rawStockMovements()) {
+        if (sm.status === 'VOID' || sm.source_type === 'WEAVER_RECEIVE') continue;
+        if ((sm.movement_type === 'PRODUCTION' || sm.kind === 'PRODUCTION') && String(sm.date ?? '').startsWith(m)) {
+          produced += Number(sm.qty) || 0;
         }
       }
 

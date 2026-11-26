@@ -2,18 +2,17 @@
 import type { PaymentPayload } from './types.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const todayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
 /**
  * Returns field errors (empty object = valid).
  * CASH: amount, payment date, collected by. CHEQUE: amount, cheque date (deposit / clearing
  * may stay empty until they happen). NEFT: amount, UTR, transaction date. Amount ≤ amount due.
  */
-export function validatePayment(p: PaymentPayload, amountDue: number): Record<string, string> {
+export function validatePayment(p: PaymentPayload, amountDue: number, today = todayIST()): Record<string, string> {
   const e: Record<string, string> = {};
   if (!Number.isInteger(p.amount) || p.amount <= 0) e.amount = 'Enter the amount';
   else if (p.amount > amountDue) e.amount = 'Amount is more than the amount due';
-
-  const today = new Date().toISOString().slice(0, 10);
 
   switch (p.mode) {
     case 'CASH':

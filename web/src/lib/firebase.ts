@@ -15,6 +15,7 @@ import {
   connectFirestoreEmulator
 } from 'firebase/firestore';
 import { connectAuthEmulator } from 'firebase/auth';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 // Firebase web config identifies the project; it is not a secret (access is
 // controlled by firestore.rules). Values come from web/.env.production.
@@ -33,6 +34,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 
 export const app = getApps()[0] ?? initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const functions = getFunctions(app);
 
 // Offline cache: reads are served locally and writes are queued while the shop
 // has no internet, then synced. This also keeps the free-tier read count low.
@@ -45,6 +47,7 @@ export const db = initializeFirestore(app, {
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
 }
 
 export {

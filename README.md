@@ -37,7 +37,16 @@ shops/{shopId}/utrs/{utr}          UTR lock
 shops/{shopId}/returns/{id}
 shops/{shopId}/audit/{id}
 shops/{shopId}/settings/{doc}
+shops/{shopId}/stockMovements/{id}  OPENING | PURCHASE | SALE | SALE_RETURN | PURCHASE_RETURN | POLISH_OUT | POLISH_IN | COUNT_ADJUST
+shops/{shopId}/stockCounts/{id}     physical count snapshots per HSN
+shops/{shopId}/polishing/{id}       sarees given to / received from polishers
 ```
+
+### Tally & Polishing
+- Dashboard shows the latest 5 recent transactions (Firestore `limit(5)` query) followed by the **Tally** section (`TallySection`), which is also reachable in full under **Stock & Production → Tally & HSN**.
+- Supports HSN prefix filtering, date presets/custom range, person filter, Sales/Production/Both toggle, CSV & PDF export, HSN-wise stock balance equation (`Opening + Purchased + Produced − Sold`), physical count variance posting (`COUNT_ADJUST`), and polishing tracking (with optional job-work bill creation).
+- **Stock & Production rework**: Final tabs `Tally & HSN | Finished Stock | Raw Materials | Weavers & Looms | Polishing | Stock Analysis` (`?tab=staff` redirects to `weavers`). Movement tables support `ACTIVE`/`VOID` with mandatory void reasons, negative-stock safety checks, non-clamped raw yarn inventory, weaver yarn reconciliation & wages due math, and oldest-first polishing payment allocation (`migrations/013_stock_rework.sql`).
+- Reference SQL schemas are documented in `migrations/012_tally_and_polish.sql` and `migrations/013_stock_rework.sql`.
 
 ## Tests (§19)
 

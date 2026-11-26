@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, Share2, Loader2 } from 'lucide-react';
 import { formatPaiseToINR } from '@yorbalance/shared';
@@ -8,8 +8,6 @@ import { Sheet } from '../components/ui/Sheet';
 import { useI18n } from '../i18n';
 import { api } from '../lib/api';
 import { useLive } from '../lib/useLiveData';
-import { todayIST } from '../lib/data/util';
-import { BillRow } from '../components/simple/BillRow';
 import { TransactionsTable, TxRow } from '../components/simple/TransactionsTable';
 import { BillDetailsSheet } from '../components/simple/BillDetailsSheet';
 
@@ -35,8 +33,14 @@ export const HistoryPage: React.FC = () => {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   const { shop } = useAuth();
   const openId = params.get('bill');
+
+  // Reset table scroll to top when filter, search, or tab changes (preserve when opening/closing View sheet)
+  useEffect(() => {
+    if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
+  }, [kind, q, from, to, partyId, status, minAmt, maxAmt]);
 
   const { data: partyData } = useLive(() => api.getParties(), []);
   const { data } = useLive(
@@ -58,19 +62,6 @@ export const HistoryPage: React.FC = () => {
     return status === 'ALL' ? all : all.filter(r => r.item_kind === 'TRANSACTION' && r.status === status);
   }, [data, status]);
   const page = rows.slice(0, shown);
-
-  const groups = useMemo(() => {
-    const today = todayIST();
-    const y = new Date(`${today}T00:00:00Z`); y.setUTCDate(y.getUTCDate() - 1);
-    const yesterday = y.toISOString().slice(0, 10);
-    const out: { label: string; rows: TxRow[] }[] = [];
-    for (const r of page) {
-      const label = r.invoice_date === today ? t('today') : r.invoice_date === yesterday ? t('yesterday') : fmtDate(r.invoice_date);
-      if (!out.length || out[out.length - 1].label !== label) out.push({ label, rows: [] });
-      out[out.length - 1].rows.push(r);
-    }
-    return out;
-  }, [page, t, fmtDate]);
 
   // §14.7 share one, many or all bills (of the current filter) as one PDF.
   const shareable = rows.filter(r => r.item_kind === 'TRANSACTION');
@@ -98,98 +89,86 @@ export const HistoryPage: React.FC = () => {
   const field = 'w-full h-12 px-3 rounded-xl border-2 border-slate-200 bg-white text-base focus:border-indigo-600 focus:outline-none';
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-900">{t('nav_history')}</h1>
+    <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      <div className="shrink-0 space-y-3">
+        <h1 className="text-2xl font-bold text-slate-900">{t('nav_history')}</h1>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {KINDS.map(k => (
-          <button key={k} onClick={() => { setKind(k); setShown(PAGE); }}
-            className={`h-11 px-4 shrink-0 rounded-full text-base font-semibold ${kind === k ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
-            {k === 'ALL' ? t('kinds_ALL') : t(`kind_${k}` as any)}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="w-5 h-5 absolute left-3 top-3.5 text-slate-400" />
-          <input value={q} onChange={e => { setQ(e.target.value); setShown(PAGE); }} placeholder={`${t('search_party')} / ${t('bill_no')}`} className={`${field} pl-10`} />
-        </div>
-        <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
-          className={`h-12 px-4 rounded-xl border-2 text-base font-semibold flex items-center gap-2 ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white'}`}>
-          <SlidersHorizontal className="w-5 h-5" /> {t('filters')}{active ? ` (${active})` : ''}
-        </button>
-      </div>
-
-      {showFilters && (
-        <div className="rounded-2xl bg-white border border-slate-200 p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="text-base font-semibold">{t('from_date')}<input type="date" value={from} onChange={e => setFrom(e.target.value)} className={`${field} mt-1`} /></label>
-          <label className="text-base font-semibold">{t('to_date')}<input type="date" value={to} onChange={e => setTo(e.target.value)} className={`${field} mt-1`} /></label>
-          <label className="text-base font-semibold">{t('party_filter')}
-            <select value={partyId} onChange={e => setPartyId(e.target.value)} className={`${field} mt-1`}>
-              <option value="">{t('any')}</option>
-              {(partyData?.parties ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label className="text-base font-semibold">{t('payment_status')}
-            <select value={status} onChange={e => setStatus(e.target.value as any)} className={`${field} mt-1`}>
-              {STATUSES.map(s => <option key={s} value={s}>{s === 'ALL' ? t('any') : t(`status_${s}` as any)}</option>)}
-            </select>
-          </label>
-          <label className="text-base font-semibold">{t('amount_from')}<input inputMode="numeric" value={minAmt} onChange={e => setMinAmt(e.target.value.replace(/\D/g, ''))} className={`${field} mt-1`} /></label>
-          <label className="text-base font-semibold">{t('amount_to')}<input inputMode="numeric" value={maxAmt} onChange={e => setMaxAmt(e.target.value.replace(/\D/g, ''))} className={`${field} mt-1`} /></label>
-          {!!active && <button onClick={clear} className="h-12 rounded-xl border-2 border-slate-200 text-base font-semibold sm:col-span-2 lg:col-span-3">{t('clear_filters')}</button>}
-        </div>
-      )}
-
-      {data && (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-base text-slate-600">{t('results_count', { n: rows.length })}</p>
-          {!!shareable.length && (
-            <button onClick={() => { setPicked(new Set()); setShareOpen(true); }}
-              className="h-11 px-4 rounded-xl border-2 border-slate-200 bg-white text-base font-semibold flex items-center gap-2">
-              <Share2 className="w-5 h-5" /> {t('share_bills')}
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          {KINDS.map(k => (
+            <button key={k} onClick={() => { setKind(k); setShown(PAGE); }}
+              className={`h-10 px-3.5 shrink-0 rounded-full text-sm font-semibold ${kind === k ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+              {k === 'ALL' ? t('kinds_ALL') : t(`kind_${k}` as any)}
             </button>
-          )}
+          ))}
         </div>
-      )}
+
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-5 h-5 absolute left-3 top-3 text-slate-400" />
+            <input value={q} onChange={e => { setQ(e.target.value); setShown(PAGE); }} placeholder={`${t('search_party')} / ${t('bill_no')}`} className={`${field} h-11 pl-10`} />
+          </div>
+          <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
+            className={`h-11 px-3.5 shrink-0 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-200 bg-white'}`}>
+            <SlidersHorizontal className="w-4 h-4" /> {t('filters')}{active ? ` (${active})` : ''}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="rounded-2xl bg-white border border-slate-200 p-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="text-sm font-semibold">{t('from_date')}<input type="date" value={from} onChange={e => setFrom(e.target.value)} className={`${field} mt-1`} /></label>
+            <label className="text-sm font-semibold">{t('to_date')}<input type="date" value={to} onChange={e => setTo(e.target.value)} className={`${field} mt-1`} /></label>
+            <label className="text-sm font-semibold">{t('party_filter')}
+              <select value={partyId} onChange={e => setPartyId(e.target.value)} className={`${field} mt-1`}>
+                <option value="">{t('any')}</option>
+                {(partyData?.parties ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold">{t('payment_status')}
+              <select value={status} onChange={e => setStatus(e.target.value as any)} className={`${field} mt-1`}>
+                {STATUSES.map(s => <option key={s} value={s}>{s === 'ALL' ? t('any') : t(`status_${s}` as any)}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold">{t('amount_from')}<input inputMode="numeric" value={minAmt} onChange={e => setMinAmt(e.target.value.replace(/\D/g, ''))} className={`${field} mt-1`} /></label>
+            <label className="text-sm font-semibold">{t('amount_to')}<input inputMode="numeric" value={maxAmt} onChange={e => setMaxAmt(e.target.value.replace(/\D/g, ''))} className={`${field} mt-1`} /></label>
+            {!!active && <button onClick={clear} className="h-11 rounded-xl border-2 border-slate-200 text-sm font-semibold sm:col-span-2 lg:col-span-3">{t('clear_filters')}</button>}
+          </div>
+        )}
+
+        {data && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-slate-600">{t('results_count', { n: rows.length })}</p>
+            {!!shareable.length && (
+              <button onClick={() => { setPicked(new Set()); setShareOpen(true); }}
+                className="h-10 px-3.5 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold flex items-center gap-2">
+                <Share2 className="w-4 h-4" /> {t('share_bills')}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {data === null && <p className="py-8 text-center text-base text-slate-500">{t('loading')}</p>}
       {data && !rows.length && <p className="py-10 text-center text-lg text-slate-500">{t('no_bills')}</p>}
 
-      {/* Phones: cards grouped by date */}
-      <div className="md:hidden space-y-4">
-        {groups.map(g => (
-          <section key={g.label}>
-            <h2 className="text-base font-bold text-slate-500 mb-2">{g.label}</h2>
-            <div className="space-y-2">
-              {g.rows.map(r => (
-                <BillRow
-                  key={`${r.item_kind}-${r.id}`}
-                  bill={r}
-                  onClick={() => open(r)}
-                  isExpanded={expandedId === r.id}
-                  onToggleExpand={() => setExpandedId(prev => (prev === r.id ? null : r.id))}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-      {/* Desktop: table with original amount, returns, paid, remaining, status */}
-      <div className="hidden md:block">
+      {/* Only scroll container: table area fills remaining height */}
+      {page.length > 0 && (
         <TransactionsTable
+          fillHeight
+          scrollRef={tableScrollRef}
           rows={page}
           onOpen={open}
-          detailed
+          detailed={kind !== 'JOB_WORK'}
+          isJobWork={kind === 'JOB_WORK'}
           expandedId={expandedId}
           onToggleExpand={id => setExpandedId(prev => (prev === id ? null : id))}
+          footer={rows.length > shown ? (
+            <div className="p-3 border-t border-slate-100">
+              <button onClick={() => setShown(shown + PAGE)} className="w-full h-11 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-700">
+                {t('show_more')} ({shown} / {rows.length})
+              </button>
+            </div>
+          ) : undefined}
         />
-      </div>
-
-      {rows.length > shown && (
-        <button onClick={() => setShown(shown + PAGE)} className="w-full h-12 rounded-xl bg-white border-2 border-slate-200 text-base font-semibold">
-          {t('show_more')} ({shown} / {rows.length})
-        </button>
       )}
 
       {openBill && <BillDetailsSheet bill={openBill} onClose={close} />}

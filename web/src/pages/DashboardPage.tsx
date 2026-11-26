@@ -9,6 +9,7 @@ import { useLive } from '../lib/useLiveData';
 import { useShell } from '../components/layout/AppShell';
 import { DashboardCharts } from '../components/dashboard/DashboardCharts';
 import { TransactionsTable } from '../components/simple/TransactionsTable';
+import { TallySection } from '../components/tally/TallySection';
 
 const PERIODS: DashboardPeriod[] = ['this_month', 'last_30_days', 'this_quarter', 'this_fy', 'all_time'];
 const PERIOD_KEY = 'yorledger_dash_period';
@@ -16,7 +17,7 @@ const PERIOD_KEY = 'yorledger_dash_period';
 /** §6 Dashboard: summary cards with a period selector, charts, recent transactions, quick actions. */
 export const DashboardPage: React.FC = () => {
   const { shop } = useAuth();
-  const { t } = useI18n();
+  const { t, fmtDate } = useI18n();
   const shell = useShell();
   const navigate = useNavigate();
   const [period, setPeriodState] = useState<DashboardPeriod>(() => {
@@ -25,7 +26,7 @@ export const DashboardPage: React.FC = () => {
   const setPeriod = (p: DashboardPeriod) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p); } catch { /* optional */ } };
 
   const { data } = useLive(() => api.getDashboard(period), [period]);
-  const { data: recent } = useLive(() => api.getRecentTransactions(10), []);
+  const { data: recent, error: recentErr } = useLive(() => api.getRecentTransactions(5), []);
   const f = data?.figures;
   const rs = (p?: number) => (p === undefined ? '…' : formatPaiseToINR(p, true));
 
@@ -40,17 +41,16 @@ export const DashboardPage: React.FC = () => {
   ];
 
   const actions = [
-    { label: t('add_party'), icon: UserPlus, cls: 'bg-slate-800', onClick: () => navigate('/parties?new=1') },
-    { label: t('new_sale'), icon: ShoppingBag, cls: 'bg-emerald-700', onClick: () => shell.openNewBill({ kind: 'SALE' }) },
-    { label: t('new_purchase'), icon: Truck, cls: 'bg-sky-700', onClick: () => shell.openNewBill({ kind: 'PURCHASE' }) },
-    { label: t('new_job_work'), icon: Scissors, cls: 'bg-amber-700', onClick: () => shell.openNewBill({ kind: 'JOB_WORK' }) },
-    { label: t('view_dues'), icon: Wallet, cls: 'bg-rose-700', onClick: () => navigate('/dues') },
-    { label: t('scan_bill'), icon: Camera, cls: 'bg-indigo-700', onClick: shell.openScan }
+    { label: t('add_party'), icon: UserPlus, cls: 'bg-indigo-700 hover:bg-indigo-800', onClick: () => navigate('/parties?new=1') },
+    { label: t('new_sale'), icon: ShoppingBag, cls: 'bg-indigo-700 hover:bg-indigo-800', onClick: () => shell.openNewBill({ kind: 'SALE' }) },
+    { label: t('new_purchase'), icon: Truck, cls: 'bg-indigo-700 hover:bg-indigo-800', onClick: () => shell.openNewBill({ kind: 'PURCHASE' }) },
+    { label: t('new_job_work'), icon: Scissors, cls: 'bg-indigo-700 hover:bg-indigo-800', onClick: () => shell.openNewBill({ kind: 'JOB_WORK' }) },
+    { label: t('view_dues'), icon: Wallet, cls: 'bg-indigo-600 hover:bg-indigo-700', onClick: () => navigate('/dues') },
+    { label: t('scan_bill'), icon: Camera, cls: 'bg-indigo-800 hover:bg-indigo-900', onClick: shell.openScan }
   ];
 
   return (
     <div className="space-y-6">
-      {/* §6.2 header content (brand, shop, notifications and profile are in the app bar) */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">{t('welcome_back', { name: shop?.owner_name ?? '' })}</h1>
         <p className="text-base text-slate-600">{shop?.name}</p>
@@ -62,9 +62,9 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {actions.map(a => (
             <button key={a.label} onClick={a.onClick}
-              className={`${a.cls} min-h-[84px] rounded-2xl text-white flex flex-col items-center justify-center gap-1 px-1 text-center active:scale-[0.98]`}>
-              <a.icon className="w-7 h-7" />
-              <span className="text-sm sm:text-base font-bold leading-tight">{a.label}</span>
+              className={`${a.cls} min-h-[76px] rounded-2xl text-white flex flex-col items-center justify-center gap-1 px-1 text-center active:scale-[0.98] transition-colors`}>
+              <a.icon className="w-6 h-6" />
+              <span className="text-xs sm:text-sm font-bold leading-tight">{a.label}</span>
             </button>
           ))}
         </div>
@@ -72,21 +72,23 @@ export const DashboardPage: React.FC = () => {
 
       {/* §6.3 period selector + six summary cards */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label={t('period')}>
-          {PERIODS.map(p => (
-            <button key={p} role="tab" aria-selected={period === p} onClick={() => setPeriod(p)}
-              className={`h-11 px-4 shrink-0 rounded-full text-base font-semibold ${period === p ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
-              {t(`period_${p}` as any)}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label={t('period')}>
+            {PERIODS.map(p => (
+              <button key={p} role="tab" aria-selected={period === p} onClick={() => setPeriod(p)}
+                className={`h-10 px-4 shrink-0 rounded-full text-sm font-semibold ${period === p ? 'bg-indigo-700 text-white' : 'bg-white border-2 border-slate-200 text-slate-700'}`}>
+                {t(`period_${p}` as any)}
+              </button>
+            ))}
+          </div>
+          {f && <p className="text-sm text-slate-500 tabular-nums">{fmtDate(f.from)} → {fmtDate(f.to)}</p>}
         </div>
-        {f && <p className="text-sm text-slate-500">{f.from} → {f.to}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {cards.map(c => (
             <div key={c.title} className="rounded-2xl bg-white border border-slate-200 p-4">
               <p className="text-base font-semibold text-slate-600 flex items-center gap-2"><c.icon className="w-5 h-5" /> {c.title}</p>
-              <p className={`mt-1 text-2xl font-extrabold break-all ${c.tone}`}>{c.value}</p>
-              <p className="mt-1 text-sm text-slate-500">{c.sub}</p>
+              <p className={`mt-1 text-2xl font-extrabold break-all tabular-nums ${c.tone}`}>{c.value}</p>
+              <p className="mt-1 text-sm text-slate-500 tabular-nums">{c.sub}</p>
             </div>
           ))}
         </div>
@@ -96,17 +98,33 @@ export const DashboardPage: React.FC = () => {
       {data && (data.figures.bills_count ? <DashboardCharts series={data.series} />
         : <p className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">{t('no_data_period')}</p>)}
 
-      {/* §6.5 recent transactions */}
+      {/* §6.5 recent transactions (latest 5) */}
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-bold text-slate-900">{t('recent_tx')}</h2>
-          <button onClick={() => navigate('/history')} className="h-11 px-3 rounded-lg text-base font-semibold text-indigo-700">{t('view_all')}</button>
+          <button onClick={() => navigate('/history')} className="h-10 px-3 rounded-lg text-sm font-semibold text-indigo-700">{t('view_all')}</button>
         </div>
-        {recent && !recent.transactions.length && (
-          <p className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">{t('empty_home')}</p>
+        {recentErr && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <span className="font-semibold">Unable to load recent bills:</span> {recentErr}
+          </div>
         )}
-        {recent && <TransactionsTable rows={recent.transactions} onOpen={r => navigate(`/history?bill=${r.id}`)} />}
+        {!recent && !recentErr && (
+          <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-2.5 animate-pulse">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-10 rounded-xl bg-slate-100" />
+            ))}
+          </div>
+        )}
+        {recent && !recent.transactions.length && (
+          <p className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center text-base text-slate-600">No bills yet</p>
+        )}
+        {recent && recent.transactions.length > 0 && (
+          <TransactionsTable rows={recent.transactions} onOpen={r => navigate(`/history?bill=${r.id}`)} />
+        )}
       </section>
+
+      <TallySection />
     </div>
   );
 };

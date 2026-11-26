@@ -10,13 +10,17 @@ import {
   UpdateShopProfilePayload, UpdateGSTSettingsPayload, DateRangeOption, LedgerFilterOptions,
   CreateBillPayload, PaymentPayload, ReturnPayload, ShopSettingsData, ShopDocumentType,
   DashboardPeriod, DashBill, dashboardFigures, dashboardSeries,
-  ReportBill, purchaseLedger, salesLedger, jobWorkLedger, gstDashboard
+  ReportBill, purchaseLedger, salesLedger, jobWorkLedger, gstDashboard,
+  TallyFilter, TallyMovementKind, buildTally, computeHsnBalances, summarizePolishing,
+  allocatePolishPayments
 } from '@yorbalance/shared';
+import { collection, getDocs, limit as firestoreLimit, orderBy, query } from 'firebase/firestore';
+import { db } from './firebase';
 import { cache } from './data/cache';
 import { compute } from './data/compute';
 import * as session from './data/session';
 import * as ledger from './data/ledger';
-import { AppError, todayIST } from './data/util';
+import { AppError, todayIST, toIso } from './data/util';
 
 /** Kept as the public error type for screens (code, message, fields, status). */
 export { AppError as ApiError };
@@ -49,18 +53,40 @@ const GST_DISCLAIMER =
 /** Bills in the shape the §11 report functions need (effective values after returns). */
 function reportBills(): ReportBill[] {
   const rets = new Map<string, ReportBill['returns']>();
-  for (const r of cache.rawReturns()) {
-    const list = rets.get(r.bill_id) ?? [];
-    list.push({ taxable: r.taxable_reduction ?? 0, cgst: r.cgst ?? 0, sgst: r.sgst ?? 0, igst: r.igst ?? 0, total: r.total_reduction ?? 0 });
-    rets.set(r.bill_id, list);
+  for (const r of cache.returns()) {
+    const list = rets.get(r.transaction_id) ?? [];
+    list.push({
+      id: r.id,
+      return_date: r.return_date,
+      reason: r.reason ?? null,
+      taxable: r.taxable_paise ?? 0,
+      cgst: r.cgst_paise ?? 0,
+      sgst: r.sgst_paise ?? 0,
+      igst: r.igst_paise ?? 0,
+      total: r.amount_paise ?? 0
+    });
+    rets.set(r.transaction_id, list);
   }
   return cache.rawBills().map(b => {
     const p = cache.rawParty(b.party_id);
+    const billDate = toIso(b.bill_date)?.slice(0, 10) ?? (typeof b.bill_date === 'string' ? b.bill_date.slice(0, 10) : '');
     return {
-      id: b.id, kind: b.kind, invoice_no: String(b.invoice_no), bill_date: b.bill_date, due_date: b.remind_on ?? null,
-      party_id: b.party_id, party_name: p?.name ?? b.party_name, party_gstin: p?.gstin ?? null, tax_mode: b.tax_mode,
-      items: (b.items ?? []).map((i: any) => ({ name: i.name, qty: i.qty })),
-      subtotal: b.subtotal, cgst: b.cgst, sgst: b.sgst, igst: b.igst, grand_total: b.grand_total, paid_total: b.paid_total,
+      id: b.id,
+      kind: b.kind,
+      invoice_no: b.invoice_prefix ? `${b.invoice_prefix}${b.invoice_no}` : String(b.invoice_no ?? ''),
+      bill_date: billDate,
+      due_date: b.remind_on ?? null,
+      party_id: b.party_id ?? '',
+      party_name: p?.name ?? b.party_name ?? b.customer_name ?? 'Party',
+      party_gstin: p?.gstin ?? null,
+      tax_mode: b.tax_mode === 'INTER' ? 'INTER' : 'INTRA',
+      items: Array.isArray(b.items) ? b.items.map((i: any) => ({ name: String(i?.name ?? ''), qty: Number(i?.qty ?? 0) })) : [],
+      subtotal: Number(b.subtotal ?? 0),
+      cgst: Number(b.cgst ?? 0),
+      sgst: Number(b.sgst ?? 0),
+      igst: Number(b.igst ?? 0),
+      grand_total: Number(b.grand_total ?? 0),
+      paid_total: Number(b.paid_total ?? 0),
       returns: rets.get(b.id) ?? []
     };
   });
@@ -106,8 +132,27 @@ export const api = {
     const s = await shopReady();
     return { charts: compute.getDashboardCharts(s.id, period as DateRangeOption) };
   },
-  getRecentTransactions: async (limit = 10, search?: string) => {
+  getRecentTransactions: async (limit = 5, search?: string) => {
     const s = await shopReady();
+    if (!search?.trim()) {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'shops', s.id, 'bills'),
+            orderBy('bill_date', 'desc'),
+            orderBy('created_at', 'desc'),
+            firestoreLimit(limit)
+          )
+        );
+        const transactions = snap.docs
+          .map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) } as Record<string, any> & { id: string }))
+          .filter(b => !b.deleted_at)
+          .map(b => cache.mapRawBill(b));
+        return { transactions, count: transactions.length };
+      } catch {
+        // Fallback when composite index is still building
+      }
+    }
     const transactions = compute.getRecentTransactions(s.id, limit, search);
     return { transactions, count: transactions.length };
   },
@@ -329,13 +374,121 @@ export const api = {
     const s = await shopReady();
     return compute.getStockTally(s.id, search);
   },
-  getItemLedger: async (itemName: string) => {
+  getItemLedger: async (itemName: string, includeVoided = false) => {
     const s = await shopReady();
-    return compute.getItemLedger(s.id, itemName);
+    return compute.getItemLedger(s.id, itemName, includeVoided);
+  },
+  voidStockMovement: async (id: string, reason: string, overrideNegative = false) => {
+    const s = await shopReady();
+    return ledger.voidStockMovement(s.id, id, reason, overrideNegative);
+  },
+  editStockMovement: async (id: string, patch: { date?: string; qty?: number; notes?: string | null; rate_paise?: number }) => {
+    const s = await shopReady();
+    return ledger.editStockMovement(s.id, id, patch);
+  },
+  addRawStockPurchase: async (payload: Parameters<typeof ledger.addRawStockPurchase>[1]) => {
+    const s = await shopReady();
+    return ledger.addRawStockPurchase(s, payload);
+  },
+  sellRawMaterial: async (payload: Parameters<typeof ledger.sellRawMaterial>[1]) => {
+    const s = await shopReady();
+    return ledger.sellRawMaterial(s, payload);
+  },
+  voidRawMaterialTx: async (id: string, reason: string) => {
+    const s = await shopReady();
+    return ledger.voidRawMaterialTx(s.id, id, reason);
+  },
+  editRawMaterialTx: async (id: string, patch: { date?: string; qty_kg?: number; rate_per_kg_paise?: number; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.editRawMaterialTx(s.id, id, patch);
+  },
+  getRawMaterialHistory: async (includeVoided = false) => {
+    await shopReady();
+    return cache.rawRawMaterialTx()
+      .filter(t => includeVoided || t.status !== 'VOID')
+      .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')));
+  },
+  issueYarnToWeaver: async (payload: Parameters<typeof ledger.issueYarnToWeaver>[1]) => {
+    const s = await shopReady();
+    return ledger.issueYarnToWeaver(s.id, payload);
+  },
+  receiveSareesFromWeaver: async (payload: Parameters<typeof ledger.receiveSareesFromWeaver>[1]) => {
+    const s = await shopReady();
+    return ledger.receiveSareesFromWeaver(s.id, payload);
+  },
+  voidWeaverTx: async (id: string, reason: string) => {
+    const s = await shopReady();
+    return ledger.voidWeaverTx(s.id, id, reason);
+  },
+  getOwnLoomsList: async () => {
+    await shopReady();
+    return (cache.rawOwnLoomsDoc()?.looms ?? []) as Array<{
+      id: string;
+      loom_no: string;
+      loom_type: 'HANDLOOM' | 'POWERLOOM';
+      status: 'RUNNING' | 'IDLE' | 'REPAIR';
+      assigned_worker?: string | null;
+    }>;
+  },
+  saveOwnLoomsList: async (looms: Parameters<typeof ledger.saveOwnLoomsList>[1]) => {
+    const s = await shopReady();
+    return ledger.saveOwnLoomsList(s.id, looms);
+  },
+  recordPolishPayment: async (payload: Parameters<typeof ledger.recordPolishPayment>[1]) => {
+    const s = await shopReady();
+    return ledger.recordPolishPayment(s.id, payload);
+  },
+  voidPolishingEntry: async (id: string, reason: string) => {
+    const s = await shopReady();
+    return ledger.voidPolishingEntry(s.id, id, reason);
+  },
+  getPolishingAccounts: async (includeVoided = false) => {
+    const s = await shopReady();
+    const all = cache.rawPolishing().filter(p => includeVoided || p.record_status !== 'VOID');
+    const batches = all
+      .filter(p => p.entry_kind !== 'PAYMENT')
+      .map(p => ({
+        id: p.id,
+        shop_id: s.id,
+        person_name: String(p.person_name ?? ''),
+        party_id: p.party_id ?? null,
+        item_name: String(p.item_name ?? 'Silk Saree'),
+        hsn_code: p.hsn_code ?? null,
+        sent_date: String(p.sent_date ?? ''),
+        received_date: p.received_date ?? null,
+        sarees_sent: Number(p.sarees_sent ?? 0),
+        sarees_received: Number(p.sarees_received ?? 0),
+        unit_price_paise: Number(p.unit_price_paise ?? 0),
+        notes: p.notes ?? null,
+        status: (p.record_status === 'VOID' ? 'VOID' : 'ACTIVE') as 'ACTIVE' | 'VOID'
+      }));
+    const payments = all
+      .filter(p => p.entry_kind === 'PAYMENT')
+      .map(p => ({
+        id: p.id,
+        shop_id: s.id,
+        person_name: String(p.person_name ?? ''),
+        party_id: p.party_id ?? null,
+        date: String(p.sent_date ?? ''),
+        amount_paise: Number(p.amount_paise ?? 0),
+        mode: String(p.payment_mode ?? 'CASH'),
+        is_advance: Boolean(p.is_advance),
+        notes: p.notes ?? null,
+        status: (p.record_status === 'VOID' ? 'VOID' : 'ACTIVE') as 'ACTIVE' | 'VOID'
+      }));
+    const allocated = allocatePolishPayments({ shopId: s.id, batches, payments });
+    return {
+      ...allocated,
+      payments: payments.sort((a, b) => b.date.localeCompare(a.date))
+    };
   },
   recordStockMovement: async (payload: { item_name: string; movement_type: any; qty: number; rate_paise?: number; date?: string; notes?: string | null }) => {
     const s = await shopReady();
     return ledger.recordStockMovement(s.id, payload);
+  },
+  mergeStockItems: async (sourceItemName: string, targetItemName: string) => {
+    const s = await shopReady();
+    return ledger.mergeStockItems(s.id, sourceItemName, targetItemName);
   },
   getRawMaterials: async () => {
     const s = await shopReady();
@@ -365,13 +518,17 @@ export const api = {
     const s = await shopReady();
     return ledger.updateOwnLooms(s.id, payload);
   },
-  createWeaver: async (payload: { name: string; phone: string; address?: string; type: any; looms_count: number; notes?: string | null }) => {
+  createWeaver: async (payload: { name: string; phone: string; additional_phones?: string[]; address: string; type: any; looms_count: number; notes?: string | null }) => {
     const s = await shopReady();
     return ledger.createWeaver(s.id, payload);
   },
-  updateWeaver: async (id: string, payload: Partial<{ name: string; phone: string; address: string; type: any; looms_count: number; notes: string | null }>) => {
+  updateWeaver: async (id: string, payload: Partial<{ name: string; phone: string; additional_phones?: string[]; address: string; type: any; looms_count: number; notes: string | null }>) => {
     const s = await shopReady();
-    return ledger.updateWeaver(s.id, id, payload);
+    return ledger.updateWeaver(s.id, id, payload as any);
+  },
+  deleteWeaver: async (id: string) => {
+    const s = await shopReady();
+    return ledger.deleteWeaver(s.id, id);
   },
   recordWeaverTx: async (payload: any) => {
     const s = await shopReady();
@@ -408,6 +565,148 @@ export const api = {
   getStockProductionAnalysis: async (dateRange?: { from?: string; to?: string }) => {
     const s = await shopReady();
     return compute.getStockProductionAnalysis(s.id, dateRange);
+  },
+  clearRemovedStockData: async () => {
+    const s = await shopReady();
+    return ledger.clearRemovedStockData(s.id);
+  },
+
+  // ---------- Tally & HSN Balance ----------
+  getTally: async (filter?: TallyFilter) => {
+    const s = await shopReady();
+    const bills = cache.rawBills().map(b => {
+      const p = cache.rawParty(b.party_id);
+      const legacyHsn = b.kind !== 'JOB_WORK' ? (b.hsn_code ?? null) : null;
+      return {
+        id: b.id,
+        shop_id: s.id,
+        kind: b.kind,
+        invoice_no: b.invoice_prefix ? `${b.invoice_prefix}${b.invoice_no}` : String(b.invoice_no ?? ''),
+        bill_date: toIso(b.bill_date)?.slice(0, 10) ?? String(b.bill_date ?? ''),
+        party_id: b.party_id ?? '',
+        party_name: p?.name ?? b.party_name ?? b.customer_name ?? 'Party',
+        subtotal: Number(b.subtotal ?? 0),
+        cgst: Number(b.cgst ?? 0),
+        sgst: Number(b.sgst ?? 0),
+        igst: Number(b.igst ?? 0),
+        items: (b.items ?? []).map((i: any) => ({
+          name: String(i.name ?? ''),
+          qty: Number(i.qty ?? 0),
+          rate: Number(i.rate ?? 0),
+          line_total: Number(i.line_total ?? 0),
+          hsn_code: b.kind === 'JOB_WORK' ? null : (i.hsn_code ?? legacyHsn)
+        }))
+      };
+    });
+    const returns = cache.returns().map(r => {
+      const bill = cache.rawBill(r.transaction_id);
+      return {
+        id: r.id,
+        shop_id: s.id,
+        bill_id: r.transaction_id,
+        kind: (bill?.kind ?? 'SALE') as 'SALE' | 'PURCHASE' | 'JOB_WORK',
+        returned_on: r.return_date,
+        party_id: r.party_id,
+        items: (r.items ?? []).map((it: any) => ({
+          name: it.name,
+          qty: it.qty,
+          hsn_code: bill?.items?.[it.index]?.hsn_code ?? bill?.hsn_code ?? null
+        }))
+      };
+    });
+    const allMovements = cache.rawStockMovements().filter(m => m.status !== 'VOID');
+    const movements = allMovements
+      .filter(m => m.kind !== 'COUNT_SNAPSHOT')
+      .map(m => ({
+        id: m.id,
+        shop_id: s.id,
+        item_name: String(m.item_name ?? ''),
+        hsn_code: m.hsn_code ?? null,
+        date: String(m.date ?? ''),
+        kind: (m.kind ?? (m.movement_type === 'OPENING' ? 'OPENING' : m.movement_type === 'PRODUCTION' ? 'PRODUCTION' : m.movement_type === 'ADJUSTMENT' ? 'COUNT_ADJUST' : m.movement_type === 'PURCHASE' ? 'PURCHASE' : m.movement_type === 'SALE' ? 'SALE' : 'COUNT_ADJUST')) as TallyMovementKind,
+        qty: Number(m.qty ?? 0),
+        bill_id: m.bill_id ?? null,
+        party_id: m.party_id ?? null
+      }));
+    const polishEntries = cache.rawPolishing()
+      .filter(p => p.record_status !== 'VOID' && p.entry_kind !== 'PAYMENT')
+      .map(p => ({
+      id: p.id,
+      shop_id: s.id,
+      date: String(p.sent_date ?? ''),
+      party_id: p.party_id ?? null,
+      person_name: String(p.person_name ?? ''),
+      item_name: String(p.item_name ?? ''),
+      hsn_code: p.hsn_code ?? null,
+      qty: Number(p.sarees_sent ?? 0),
+      unit_price_paise: Number(p.unit_price_paise ?? 0),
+      total_paise: Number(p.total_amount_paise ?? 0),
+      received_qty: Number(p.sarees_received ?? 0),
+      bill_id: p.bill_id ?? null
+    }));
+    const counts = allMovements
+      .filter(m => m.kind === 'COUNT_SNAPSHOT')
+      .map(c => ({
+        shop_id: s.id,
+        hsn_code: String(c.hsn_code ?? ''),
+        counted_qty: Number(c.counted_qty ?? 0),
+        counted_on: String(c.date ?? '')
+      }));
+    const result = buildTally({ shopId: s.id, bills, returns, movements, polishEntries, counts, filter });
+    const polishSummary = summarizePolishing(s.id, polishEntries, filter);
+    return {
+      ...result,
+      polish_summary: polishSummary,
+      polish_entries: polishEntries.filter(e =>
+        (!filter?.from || e.date >= filter.from) &&
+        (!filter?.to || e.date <= filter.to) &&
+        (!filter?.partyId || e.party_id === filter.partyId || e.person_name === filter.partyId) &&
+        (!filter?.hsn?.trim() || (e.hsn_code ?? '').startsWith(filter.hsn.trim()))
+      )
+    };
+  },
+  getTallyBalance: async (hsnPrefix?: string) => {
+    const t = await api.getTally({ hsn: hsnPrefix });
+    return t.hsn_balances;
+  },
+  postStockCount: async (payload: { hsn_code: string; item_name?: string; counted_qty: number; book_balance: number; date?: string; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.postStockCount(s.id, payload);
+  },
+  postStockAdjust: async (payload: { item_name: string; hsn_code?: string | null; kind: TallyMovementKind; qty: number; date?: string; notes?: string | null }) => {
+    const s = await shopReady();
+    return ledger.postStockAdjust(s.id, payload);
+  },
+  getPolishSummary: async (filter?: { from?: string; to?: string; partyId?: string; hsn?: string }) => {
+    const s = await shopReady();
+    const entries = cache.rawPolishing()
+      .filter(p => p.record_status !== 'VOID' && p.entry_kind !== 'PAYMENT')
+      .map(p => ({
+      id: p.id,
+      shop_id: s.id,
+      date: String(p.sent_date ?? ''),
+      party_id: p.party_id ?? null,
+      person_name: String(p.person_name ?? ''),
+      item_name: String(p.item_name ?? ''),
+      hsn_code: p.hsn_code ?? null,
+      qty: Number(p.sarees_sent ?? 0),
+      unit_price_paise: Number(p.unit_price_paise ?? 0),
+      total_paise: Number(p.total_amount_paise ?? 0),
+      received_qty: Number(p.sarees_received ?? 0),
+      bill_id: p.bill_id ?? null
+    }));
+    return {
+      summary: summarizePolishing(s.id, entries, filter),
+      entries
+    };
+  },
+  givePolish: async (payload: Parameters<typeof ledger.givePolish>[1]) => {
+    const s = await shopReady();
+    return ledger.givePolish(s, payload);
+  },
+  receivePolish: async (batchId: string, payload: Parameters<typeof ledger.receivePolish>[2]) => {
+    const s = await shopReady();
+    return ledger.receivePolish(s.id, batchId, payload);
   },
 
   /** Re-render hook: fires on any live data change for the active shop. */
